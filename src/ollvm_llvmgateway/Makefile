@@ -2,7 +2,7 @@ LIBNAME=ollvm_llvmgateway
 
 SOURCES = $(LIBNAME).ml
 CMI = $(LIBNAME).cmi
-CAMLFLAGS = -I ../ollvm -package llvm
+CAMLFLAGS = -I ../../../ml/extracted/_build -I ../ollvm -package llvm
 
 include ../Makefile.common
 include .depend

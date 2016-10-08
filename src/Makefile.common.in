@@ -75,7 +75,9 @@ all: depend $(CMI) $(BYTE) $(NATIVE)
 
 clean:
 	rm -f *.cm[iox] *~ .*~ *.o *.cma *.cmxa *.a
+	rm -rf $(GENERATED)
 	rm -rf $(DOCDIR)
+	rm .depend
 
 .depend: $(SOURCES2)
 	$(CAMLDEP) *.mli *.ml > .depend

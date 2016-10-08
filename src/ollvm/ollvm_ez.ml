@@ -86,14 +86,14 @@ module Instr = struct
   let fcmp cmp (t, op1) (_, op2) =
     (Type.i1, Ollvm_ast.INSTR_FCmp (cmp, t, op1, op2))
 
-  let ffalse = fcmp Ollvm_ast.False let foeq = fcmp Ollvm_ast.Oeq
-  let fogt = fcmp Ollvm_ast.Ogt let foge = fcmp Ollvm_ast.Oge
-  let folt = fcmp Ollvm_ast.Olt let fole = fcmp Ollvm_ast.Ole
-  let fone = fcmp Ollvm_ast.One let ord = fcmp Ollvm_ast.Ord
-  let fueq = fcmp Ollvm_ast.Ueq let fugt = fcmp Ollvm_ast.Ugt
-  let fuge = fcmp Ollvm_ast.Uge let fult = fcmp Ollvm_ast.Ult
-  let fule = fcmp Ollvm_ast.Ule let fune = fcmp Ollvm_ast.Une
-  let funo = fcmp Ollvm_ast.Uno let ftrue = fcmp Ollvm_ast.True
+  let ffalse = fcmp Ollvm_ast.FFalse let foeq = fcmp Ollvm_ast.FOeq
+  let fogt = fcmp Ollvm_ast.FOgt let foge = fcmp Ollvm_ast.FOge
+  let folt = fcmp Ollvm_ast.FOlt let fole = fcmp Ollvm_ast.FOle
+  let fone = fcmp Ollvm_ast.FOne let ord = fcmp Ollvm_ast.FOrd
+  let fueq = fcmp Ollvm_ast.FUeq let fugt = fcmp Ollvm_ast.FUgt
+  let fuge = fcmp Ollvm_ast.FUge let fult = fcmp Ollvm_ast.FUlt
+  let fule = fcmp Ollvm_ast.FUle let fune = fcmp Ollvm_ast.FUne
+  let funo = fcmp Ollvm_ast.FUno let ftrue = fcmp Ollvm_ast.FTrue
 
   let ibinop b (t, op1) (_, op2) =
     (t, Ollvm_ast.INSTR_IBinop (b, t, op1, op2))

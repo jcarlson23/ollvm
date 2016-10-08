@@ -156,22 +156,22 @@ let icmp : Ollvm.Ast.icmp -> Llvm.Icmp.t =
 let fcmp : Ollvm.Ast.fcmp -> Llvm.Fcmp.t =
   let open Llvm.Fcmp
   in function
-  | False -> False
-  | Oeq   -> Oeq
-  | Ogt   -> Ogt
-  | Oge   -> Oge
-  | Olt   -> Olt
-  | Ole   -> Ole
-  | One   -> One
-  | Ord   -> Ord
-  | Uno   -> Uno
-  | Ueq   -> Ueq
-  | Ugt   -> Ugt
-  | Uge   -> Uge
-  | Ult   -> Ult
-  | Ule   -> Ule
-  | Une   -> Une
-  | True  -> True
+  | FFalse -> False
+  | FOeq   -> Oeq
+  | FOgt   -> Ogt
+  | FOge   -> Oge
+  | FOlt   -> Olt
+  | FOle   -> Ole
+  | FOne   -> One
+  | FOrd   -> Ord
+  | FUno   -> Uno
+  | FUeq   -> Ueq
+  | FUgt   -> Ugt
+  | FUge   -> Uge
+  | FUlt   -> Ult
+  | FUle   -> Ule
+  | FUne   -> Une
+  | FTrue  -> True
 
 let ibinop : Ollvm.Ast.ibinop -> (Llvm.llvalue -> Llvm.llvalue -> string ->
                                 Llvm.llbuilder -> Llvm.llvalue) =

@@ -1,4 +1,4 @@
- (* {{{ LICENSE                                                              *
+%{ (* {{{ LICENSE                                                              *
   * vi: set fdm=marker fdl=0:                                                *
   *                                                                          *
   * Copyright (c) 2012 Raphaël Proust <raphlalou@gmail.com>                  *
@@ -19,7 +19,7 @@
   * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
   * }}}                                                                      *)
 
-%{
+
 
 open Ollvm_ast
 
@@ -400,9 +400,9 @@ icmp:
   |KW_SGT{Sgt}|KW_SGE{Sge}|KW_SLT{Slt}|KW_SLE{Sle}
 
 fcmp:
-  KW_FALSE{False}|KW_OEQ{Oeq}|KW_OGT{Ogt}|KW_OGE{Oge}|KW_OLT{Olt}|KW_OLE{Ole}
-  |KW_ONE{One}|KW_ORD{Ord}|KW_UNO{Uno}|KW_UEQ{Ueq}|KW_UGT{Ugt}|KW_UGE{Uge}
-  |KW_ULT{Ult}|KW_ULE{Ule}|KW_UNE{Une}|KW_TRUE{True}
+  KW_FALSE{FFalse}|KW_OEQ{FOeq}|KW_OGT{FOgt}|KW_OGE{FOge}|KW_OLT{FOlt}|KW_OLE{FOle}
+  |KW_ONE{FOne}|KW_ORD{FOrd}|KW_UNO{FUno}|KW_UEQ{FUeq}|KW_UGT{FUgt}|KW_UGE{FUge}
+  |KW_ULT{FUlt}|KW_ULE{FUle}|KW_UNE{FUne}|KW_TRUE{FTrue}
 
 conversion:
   |KW_TRUNC{Trunc}|KW_ZEXT{Zext}|KW_SEXT{Sext}|KW_FPTRUNC{Fptrunc}

@@ -179,22 +179,22 @@ and icmp : Format.formatter -> Ollvm_ast.icmp -> unit =
 and fcmp : Format.formatter -> Ollvm_ast.fcmp -> unit =
   fun ppf fcmp ->
   fprintf ppf ( match fcmp with
-                | False -> "false"
-                | Oeq   -> "oeq"
-                | Ogt   -> "ogt"
-                | Oge   -> "oge"
-                | Olt   -> "olt"
-                | Ole   -> "ole"
-                | One   -> "one"
-                | Ord   -> "ord"
-                | Uno   -> "uno"
-                | Ueq   -> "ueq"
-                | Ugt   -> "ugt"
-                | Uge   -> "uge"
-                | Ult   -> "ult"
-                | Ule   -> "ule"
-                | Une   -> "une"
-                | True  -> "true")
+                | FFalse -> "false"
+                | FOeq   -> "oeq"
+                | FOgt   -> "ogt"
+                | FOge   -> "oge"
+                | FOlt   -> "olt"
+                | FOle   -> "ole"
+                | FOne   -> "one"
+                | FOrd   -> "ord"
+                | FUno   -> "uno"
+                | FUeq   -> "ueq"
+                | FUgt   -> "ugt"
+                | FUge   -> "uge"
+                | FUlt   -> "ult"
+                | FUle   -> "ule"
+                | FUne   -> "une"
+                | FTrue  -> "true")
 
 
 and ibinop : Format.formatter -> Ollvm_ast.ibinop -> unit =
