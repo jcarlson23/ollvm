@@ -1,3 +1,12 @@
+# Vellvm fork of the ollvm project
+
+### Created in 2016 by Steve Zdancewic
+
+This version of ollvm has been modified to use abstract syntax
+representation extracted from Vellvm's coq development.
+
+----
+
 # ollvm 0.99
 
 ollvm library offers an interface to manipulate LLVM IR in pure OCaml.
