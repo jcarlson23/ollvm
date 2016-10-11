@@ -1,8 +1,9 @@
 LIBNAME=ollvm_llvmgateway
+ASTDIR:=../../../ast
+CAMLFLAGS=-I $(ASTDIR)/ -I ../ollvm/ -package llvm
 
 SOURCES = $(LIBNAME).ml
 CMI = $(LIBNAME).cmi
-CAMLFLAGS = -I ../../../ml/extracted/_build -I ../ollvm -package llvm
 
 include ../Makefile.common
 include .depend
