@@ -125,17 +125,16 @@ and fn_attr : Format.formatter -> Ollvm_ast.fn_attr -> unit =
 
 and ident : t -> Format.formatter -> Ollvm_ast.ident -> unit =
 
-  let ident_format : (string -> int) -> Format.formatter -> string -> unit =
-  fun finder ppf i ->
-  if i.[0] >= '0' && i.[0] <= '9' then pp_print_int ppf (finder i)
-  else pp_print_string ppf i in
+  (* let ident_format : (string -> int) -> Format.formatter -> string -> unit = *)
+  (* fun finder ppf i -> *)
+  (* if i.[0] >= '0' && i.[0] <= '9' then pp_print_int ppf (finder i) *)
+  (* else pp_print_string ppf i in *)
 
   fun env ppf ->
   function
-  | ID_Global i -> pp_print_char ppf '@' ;
-                   ident_format (find_global env) ppf i
-  | ID_Local i  -> pp_print_char ppf '%' ;
-                   ident_format (find_local env) ppf i
+  | ID_Global i -> pp_print_char ppf '@' ; pp_print_string ppf i
+  | ID_Local i  -> pp_print_char ppf '%' ; pp_print_string ppf i
+
 
 and typ : Format.formatter -> Ollvm_ast.typ -> unit =
   fun ppf ->
@@ -551,14 +550,15 @@ and definition : t -> Format.formatter -> Ollvm_ast.definition -> unit =
   pp_print_char ppf '}' ;
 
 and block : t -> Format.formatter -> Ollvm_ast.block -> unit =
-  fun env ppf (i, b) ->
-  begin try pp_print_int ppf (find_local env i)
-        with Failure "int_of_string" -> pp_print_string ppf i end ;
-  pp_print_char ppf ':' ;
-  pp_open_box ppf 2 ;
-  pp_force_newline ppf () ;
-  pp_print_list ~pp_sep:pp_force_newline (instr env) ppf b ;
-  pp_close_box ppf ()
+  fun env ppf (lbl, b) ->
+    begin match lbl with
+      | BAnon i -> fprintf ppf "; <label> %d" i
+      | BName s -> (pp_print_string ppf s; pp_print_char ppf ':')
+    end;
+    pp_open_box ppf 2 ;
+    pp_force_newline ppf () ;
+    pp_print_list ~pp_sep:pp_force_newline (instr env) ppf b ;
+    pp_close_box ppf ()
 
 and modul : t -> Format.formatter -> Ollvm_ast.modul -> unit =
   fun env ppf m ->

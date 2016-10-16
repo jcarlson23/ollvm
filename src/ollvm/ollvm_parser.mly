@@ -255,10 +255,21 @@ definition:
         } }
 
 df_blocks:
+  | bs=pair(terminated(LABEL, EOL+)?, terminated(instr, EOL+)+)*
+  { let aid = ref 0 in
+    let get () = let id = !aid in incr aid; id in
+    List.map (fun (lbl, instrs) ->
+      ((match lbl with
+      | None -> BAnon (get ())
+      | Some s -> BName s),
+      instrs)) bs }
+
+(*
   | hd_lbl=terminated(LABEL, EOL+)? hd=terminated(instr, EOL+)+
     tl=pair(terminated(LABEL, EOL+), terminated(instr, EOL+)+)*
-  { let hb_lbl=match hd_lbl with Some x -> x | _ -> "" in
+  { let hb_lbl=match hd_lbl with Some x -> BName x | _ -> BAnon  in
     (hb_lbl, hd) :: tl}
+*)
 
 df_pre_attr:
   | a=linkage                            { OPT_linkage a     }
@@ -549,9 +560,15 @@ value:
   | c=const { c             }
   | i=ident { VALUE_Ident i }
 
+lident:
+  | l=LOCAL  { l }
+
+gident:
+  | l=LOCAL  { l }
+
 ident:
-  | l=GLOBAL { ID_Global l }
-  | l=LOCAL  { ID_Local l  }
+  | l=gident { ID_Global l }
+  | l=lident  { ID_Local l  }
 
 tvalue: t=typ v=value { (t, v) }
 tconst: t=typ c=const { (t, c) }

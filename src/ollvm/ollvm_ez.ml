@@ -188,7 +188,7 @@ module Block = struct
     let args = List.map Value.ident args in
     let open Ollvm_ast in
     let extract_name = function
-      | Ollvm_ast.ID_Local s -> s
+      | Ollvm_ast.ID_Local s -> BName s
       | _ -> assert false in
 
     let blocks = List.map (fun (id, instrs) -> (extract_name id, instrs)) instrs
