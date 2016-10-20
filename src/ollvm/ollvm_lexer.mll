@@ -265,7 +265,7 @@ rule token = parse
   | '>'  { GT }
 
   (* labels *)
-  | (label_char)+ as l ':' { LABEL l }
+  | ((label_char)+) as l ':' { LABEL l }
 
   (* identifier *)
   | '@' { GLOBAL (ident_body lexbuf) }

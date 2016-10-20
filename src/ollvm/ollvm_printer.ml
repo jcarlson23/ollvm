@@ -159,13 +159,13 @@ and typ : Format.formatter -> Ollvm_ast.typ -> unit =
                                      (pp_print_list ~pp_sep:pp_comma_space typ) tl
   | TYPE_Opaque           -> assert false
   | TYPE_Vector (i, t)    -> fprintf ppf "<%d x %a>" i typ t ;
-
+  | TYPE_Identified i     -> ident (empty_env ()) ppf i
 
 and icmp : Format.formatter -> Ollvm_ast.icmp -> unit =
   fun ppf icmp ->
   fprintf ppf ( match icmp with
                 | Eq  -> "eq"
-                | Ne  -> "neq"
+                | Ne  -> "ne"
                 | Ugt -> "ugt"
                 | Uge -> "uge"
                 | Ult -> "ult"

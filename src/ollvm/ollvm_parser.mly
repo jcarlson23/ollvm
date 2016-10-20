@@ -132,9 +132,8 @@ let is_externally_initialized l =
 
 %%
 
-(* NB: Will produce parsing error with file not ending with a EOL *)
 toplevelentries:
-  | EOL* m=terminated(toplevelentry, EOL+)* EOF { m }
+  | EOL* m=terminated(toplevelentry, EOL*)* EOF { m }
 
 toplevelentry:
   | d=definition                        { TLE_Definition d               }
@@ -333,6 +332,7 @@ typ:
   | LTLCURLY ts=separated_list(COMMA, typ) RCURLYGT   { TYPE_Packed_struct ts }
   | KW_OPAQUE                                         { TYPE_Opaque           }
   | LT n=INTEGER KW_X t=typ GT                        { TYPE_Vector (n, t)    }
+  | l=lident                                          { TYPE_Identified (ID_Local l)  }
 
 param_attr:
   | KW_ZEROEXT                   { PARAMATTR_Zeroext           }
@@ -564,7 +564,7 @@ lident:
   | l=LOCAL  { l }
 
 gident:
-  | l=LOCAL  { l }
+  | g=GLOBAL  { g }
 
 ident:
   | l=gident { ID_Global l }
