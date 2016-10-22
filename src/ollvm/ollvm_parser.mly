@@ -148,13 +148,13 @@ toplevel_entity:
 
 (* metadata are not implemented yet, but are at least (partially) parsed *)
 tle_metadata:
-  | BANGLCURLY m=separated_list(COMMA, METADATA_ID) RCURLY
+  | BANGLCURLY m=separated_list(csep, METADATA_ID) RCURLY
    { METADATA_Named m }
   | KW_METADATA m=metadata_node
     { m }
 
 metadata_node:
-  | BANGLCURLY m=separated_list(COMMA, metadata_value) RCURLY
+  | BANGLCURLY m=separated_list(csep, metadata_value) RCURLY
     { METADATA_Node m }
 
 metadata_value:
@@ -174,7 +174,7 @@ global_decl:
     attrs=global_attr*
     g_constant=global_is_constant
     g_typ=typ
-    opt=preceded(COMMA, separated_list(COMMA, global_attr))?
+    opt=preceded(COMMA, separated_list(csep, global_attr))?
       { let opt = match opt with Some o -> o | None -> [] in
         { g_ident=ID_Global ident;
           g_typ;
@@ -197,7 +197,7 @@ global_decl:
     g_constant=global_is_constant
     g_typ=typ
     gv=value
-    opt=preceded(COMMA, separated_list(COMMA, global_attr))?
+    opt=preceded(COMMA, separated_list(csep, global_attr))?
       { let opt = match opt with Some o -> o | None -> [] in
         { g_ident=ID_Global ident;
           g_typ;
@@ -239,7 +239,7 @@ declaration:
     dc_ret_attrs=param_attr*
     dc_ret_typ=typ
     name=GLOBAL
-    LPAREN dc_args=separated_list(COMMA, dc_arg) RPAREN
+    LPAREN dc_args=separated_list(csep, dc_arg) RPAREN
     post_attrs=global_attr*
     { {dc_type=TYPE_Function(dc_ret_typ, List.map fst dc_args);
        dc_name=ID_Global name;
@@ -251,7 +251,7 @@ definition:
     df_ret_attrs=param_attr*
     df_ret_typ=typ
     name=GLOBAL
-    LPAREN df_args=separated_list(COMMA, df_arg) RPAREN
+    LPAREN df_args=separated_list(csep, df_arg) RPAREN
     post_attrs=df_post_attr* EOL*
     LCURLY EOL*
     df_blocks=df_blocks
@@ -363,9 +363,9 @@ typ:
   | KW_X86_MMX                                        { TYPE_X86_mmx          }
   | t=typ STAR                                        { TYPE_Pointer t        }
   | LSQUARE n=INTEGER KW_X t=typ RSQUARE              { TYPE_Array (n, t)     }
-  | t=typ LPAREN ts=separated_list(COMMA, typ) RPAREN { TYPE_Function (t, ts) }
-  | LCURLY ts=separated_list(COMMA, typ) RCURLY       { TYPE_Struct ts        }
-  | LTLCURLY ts=separated_list(COMMA, typ) RCURLYGT   { TYPE_Packed_struct ts }
+  | t=typ LPAREN ts=separated_list(csep, typ) RPAREN  { TYPE_Function (t, ts) }
+  | LCURLY ts=separated_list(csep, typ) RCURLY        { TYPE_Struct ts        }
+  | LTLCURLY ts=separated_list(csep, typ) RCURLYGT    { TYPE_Packed_struct ts }
   | KW_OPAQUE                                         { TYPE_Opaque           }
   | LT n=INTEGER KW_X t=typ GT                        { TYPE_Vector (n, t)    }
   | l=lident                                          { TYPE_Identified (ID_Local l)  }
@@ -489,7 +489,7 @@ instr:
     { INSTR_GetElementPtr (t, ptr, idx) }
 
   | KW_TAIL? KW_CALL cconv? list(param_attr) f=tident
-    a=delimited(LPAREN, separated_list(COMMA, call_arg), RPAREN)
+    a=delimited(LPAREN, separated_list(csep, call_arg), RPAREN)
     list(fn_attr)
     { INSTR_Call (f, a) }
 
@@ -500,7 +500,7 @@ instr:
   | KW_LOAD vol=KW_VOLATILE? t=typ COMMA tv=tvalue a=preceded(COMMA, align)?
     { INSTR_Load (vol<>None, t, tv, a) }
 
-  | KW_PHI t=typ table=separated_nonempty_list(COMMA, phi_table_entry)
+  | KW_PHI t=typ table=separated_nonempty_list(csep, phi_table_entry)
     { INSTR_Phi (t, table) }
 
   | KW_SELECT if_=tvalue COMMA then_=tvalue COMMA else_= tvalue
@@ -514,11 +514,11 @@ instr:
     { INSTR_InsertElement (vec, new_el, idx)  }
 
   | KW_EXTRACTVALUE tv=tvalue COMMA
-    idx=separated_nonempty_list (COMMA, INTEGER)
+    idx=separated_nonempty_list (csep, INTEGER)
     { INSTR_ExtractValue (tv, idx) }
 
   | KW_INSERTVALUE agg=tvalue COMMA new_val=tvalue COMMA
-    idx=separated_nonempty_list (COMMA, INTEGER)
+    idx=separated_nonempty_list (csep, INTEGER)
     { INSTR_InsertValue (agg, new_val, idx) }
 
   | KW_SHUFFLEVECTOR v1=tvalue COMMA v2=tvalue COMMA mask=tvalue
@@ -552,7 +552,7 @@ instr:
     { INSTR_Switch (c, def, table) }
 
   | KW_INDIRECTBR tv=tvalue
-    COMMA LSQUARE til=separated_list(COMMA, tident)  RSQUARE
+    COMMA LSQUARE til=separated_list(csep, tident)  RSQUARE
     { INSTR_IndirectBr (tv, til) }
 
   | KW_RESUME tv=tvalue
@@ -562,7 +562,7 @@ instr:
     { INSTR_Unreachable }
 
   | KW_INVOKE cconv? ret=tident
-    LPAREN a=separated_list(COMMA, call_arg) RPAREN
+    LPAREN a=separated_list(csep, call_arg) RPAREN
     list(fn_attr) KW_TO l1=tident KW_UNWIND l2=tident
     { INSTR_Invoke (ret, a, l1, l2)  }
 
@@ -578,6 +578,9 @@ phi_table_entry:
 switch_table_entry:
   | v=tvalue COMMA i=tident EOL? { (v, i) }
 
+csep:
+  COMMA EOL* { () }
+
 const:
   | i=INTEGER                                         { VALUE_Integer i        }
   | f=FLOAT                                           { VALUE_Float f          }
@@ -586,10 +589,10 @@ const:
   | KW_NULL                                           { VALUE_Null             }
   | KW_UNDEF                                          { VALUE_Undef            }
   | KW_ZEROINITIALIZER                                { VALUE_Zero_initializer }
-  | LCURLY l=separated_list(COMMA, tconst) RCURLY     { VALUE_Struct l         }
-  | LTLCURLY l=separated_list(COMMA, tconst) RCURLYGT { VALUE_Struct l         }
-  | LSQUARE l=separated_list(COMMA, tconst) RSQUARE   { VALUE_Array l          }
-  | LT l=separated_list(COMMA, tconst) GT             { VALUE_Vector l         }
+  | LCURLY l=separated_list(csep, tconst) RCURLY      { VALUE_Struct l         }
+  | LTLCURLY l=separated_list(csep, tconst) RCURLYGT  { VALUE_Struct l         }
+  | LSQUARE l=separated_list(csep, tconst) RSQUARE    { VALUE_Array l          }
+  | LT l=separated_list(csep, tconst) GT              { VALUE_Vector l         }
   | i=ident                                           { VALUE_Ident i          }
   | KW_C cstr=STRING                                  { VALUE_Cstring cstr     }
 
