@@ -222,7 +222,8 @@
   | "null"  -> KW_NULL
   | "undef" -> KW_UNDEF
   | "zeroinitializer" -> KW_ZEROINITIALIZER
-
+  | "c" -> KW_C
+  
   (* misc *)
   | "x" -> KW_X
 
@@ -315,13 +316,13 @@ and ident_body = parse
     let parsing_err lexbuf =
       let pos = Lexing.lexeme_start_p lexbuf in
       let msg =
-        Printf.sprintf "Parsing error: line %d, column %d, character '%s'"
+        Printf.sprintf "Parsing error: line %d, column %d, token '%s'"
                        pos.Lexing.pos_lnum
                        (pos.Lexing.pos_cnum - pos.Lexing.pos_bol)
                        (Lexing.lexeme lexbuf)
       in failwith msg
     in
-    try Ollvm_parser.toplevelentries token lexbuf
+    try Ollvm_parser.toplevel_entities token lexbuf
     with Ollvm_parser.Error -> parsing_err lexbuf
 
 }

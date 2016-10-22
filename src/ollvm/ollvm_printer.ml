@@ -291,8 +291,9 @@ and instr : t -> Format.formatter -> Ollvm_ast.instr -> unit =
              (value env) v
              typ t2
 
-  | INSTR_GetElementPtr (tv, tvl) ->
-     fprintf ppf "getelementptr %a, %a"
+  | INSTR_GetElementPtr (t, tv, tvl) ->
+    fprintf ppf "getelementptr %a, %a, %a"
+             typ t
              (tvalue env) tv
              (pp_print_list ~pp_sep:pp_comma_space (tvalue env)) tvl
 
@@ -308,9 +309,11 @@ and instr : t -> Format.formatter -> Ollvm_ast.instr -> unit =
      (match a with None -> ()
                  | Some a -> fprintf ppf ", align %d" a)
 
-  | INSTR_Load (vol, tv, a) ->
+  | INSTR_Load (vol, t, tv, a) ->
      pp_print_string ppf "load " ;
      if vol then pp_print_string ppf "volatile " ;
+     (typ ppf t);
+     pp_print_string ppf ", ";
      (tvalue env) ppf tv ;
      (match a with None -> ()
                  | Some a -> fprintf ppf ", align %d" a)
@@ -426,23 +429,24 @@ and value : t -> Format.formatter -> Ollvm_ast.value -> unit =
   | VALUE_Packed_struct tvl -> fprintf ppf "<{%a}>"
                                        (pp_print_list ~pp_sep:pp_comma_space (tvalue env)) tvl
   | VALUE_Zero_initializer  -> pp_print_string ppf "zeroinitializer"
+  | VALUE_Cstring s -> fprintf ppf "c\"%s\"" s
 
 and tvalue env ppf (t, v) = fprintf ppf "%a %a" typ t (value env) v
 
 and tident env ppf (t, v) = fprintf ppf "%a %a" typ t (ident env) v
 
-and toplevelentries : t -> Format.formatter -> Ollvm_ast.toplevelentries -> unit =
+and toplevel_entities : t -> Format.formatter -> Ollvm_ast.toplevel_entities -> unit =
   fun env ppf entries ->
-  pp_print_list ~pp_sep:pp_force_newline (toplevelentry env) ppf entries
+  pp_print_list ~pp_sep:pp_force_newline (toplevel_entity env) ppf entries
 
-and toplevelentry : t -> Format.formatter -> Ollvm_ast.toplevelentry -> unit =
+and toplevel_entity : t -> Format.formatter -> Ollvm_ast.toplevel_entity -> unit =
   fun env ppf ->
   function
   | TLE_Target s               -> fprintf ppf "target triple = \"%s\"" s
   | TLE_Datalayout s           -> fprintf ppf "target datalayout = \"%s\"" s
   | TLE_Declaration d          -> declaration env ppf d
   | TLE_Definition d           -> definition env ppf d
-  | TLE_Type_decl (i, t)       -> fprintf ppf "%a %a" (ident env) i typ t
+  | TLE_Type_decl (i, t)       -> fprintf ppf "%a = type %a" (ident env) i typ t
   | TLE_Global g               -> global env ppf g
   | TLE_Metadata (i, m)        -> fprintf ppf "!%s = %a" i (metadata env) m
   | TLE_Attribute_group (i, a) -> fprintf ppf "#%d = { %a }" i
@@ -473,7 +477,7 @@ and global : t -> Format.formatter -> Ollvm_ast.global -> unit =
     g_value = vo;
   } -> fprintf ppf "%a = %s %a"
                (ident env) i (if b then "constant" else "global") typ t ;
-       (match vo with None -> () | Some v -> (value env) ppf v) ;
+       (match vo with None -> () | Some v -> (pp_print_string ppf " "; (value env) ppf v)) ;
        (match s with None -> ()
                    | Some s -> fprintf ppf ", section %s" s) ;
        (match a with None -> ()
@@ -566,10 +570,10 @@ and modul : t -> Format.formatter -> Ollvm_ast.modul -> unit =
   fprintf ppf "; ModuleID = '%s'" m.m_name ;
   pp_force_newline ppf () ;
 
-  toplevelentry env ppf m.m_target ;
+  toplevel_entity env ppf m.m_target ;
   pp_force_newline ppf () ;
 
-  toplevelentry env ppf m.m_datalayout ;
+  toplevel_entity env ppf m.m_datalayout ;
   pp_force_newline ppf () ;
 
   pp_print_list ~pp_sep:pp_force_newline (global (reset_local env)) ppf

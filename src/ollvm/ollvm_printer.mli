@@ -28,9 +28,9 @@ val instr : t -> Format.formatter -> Ollvm_ast.instr -> unit
 val value : t -> Format.formatter -> Ollvm_ast.value -> unit
 val tvalue : t -> Format.formatter -> Ollvm_ast.tvalue -> unit
 val tident : t -> Format.formatter -> Ollvm_ast.tident -> unit
-val toplevelentries :
-  t -> Format.formatter -> Ollvm_ast.toplevelentries -> unit
-val toplevelentry : t -> Format.formatter -> Ollvm_ast.toplevelentry -> unit
+val toplevel_entities :
+  t -> Format.formatter -> Ollvm_ast.toplevel_entities -> unit
+val toplevel_entity : t -> Format.formatter -> Ollvm_ast.toplevel_entity -> unit
 val metadata : t -> Format.formatter -> Ollvm_ast.metadata -> unit
 val global : t -> Format.formatter -> Ollvm_ast.global -> unit
 val declaration : t -> Format.formatter -> Ollvm_ast.declaration -> unit

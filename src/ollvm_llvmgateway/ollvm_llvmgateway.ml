@@ -146,7 +146,8 @@ let rec typ : env -> Ollvm.Ast.typ -> Llvm.lltype =
   | TYPE_Packed_struct s   ->
      packed_struct_type ctx (Array.of_list s |> Array.map (typ env))
   | TYPE_Opaque            -> assert false
-  | TYPE_Vector (i, t)      -> vector_type (typ env t) i
+  | TYPE_Vector (i, t)     -> vector_type (typ env t) i
+  | TYPE_Identified i      -> failwith "SAZ: TODO"  
 
 let icmp : Ollvm.Ast.icmp -> Llvm.Icmp.t =
   let open Llvm.Icmp
@@ -284,7 +285,7 @@ let rec instr : env -> Ollvm.Ast.instr -> (env * Llvm.llvalue) =
      let conv = conversion_type conv in
      (env, conv v (typ env ty'))
 
-  | INSTR_GetElementPtr ((t, v), tvl)       ->
+  | INSTR_GetElementPtr (_, (t, v), tvl)       ->
      let indices = List.map (fun (t,v) -> value env t v) tvl
                    |> Array.of_list in
      (env, build_gep (value env t v) indices "" env.b)
@@ -336,7 +337,7 @@ let rec instr : env -> Ollvm.Ast.instr -> (env * Llvm.llvalue) =
        | Some (t, nb) ->
           build_array_alloca (typ env ty) (value env t nb) "" env.b )
 
-  | INSTR_Load (_, (t, v), _)                 ->
+  | INSTR_Load (_, _, (t, v), _)                 ->
      (env, build_load (value env t v) "" env.b)
 
   | INSTR_Phi (t, incoming)                 ->

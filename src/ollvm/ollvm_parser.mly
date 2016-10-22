@@ -94,7 +94,7 @@ let is_externally_initialized l =
 %token<string> STRING
 %token<int> INTEGER
 %token<float> FLOAT
-%token KW_NULL KW_UNDEF KW_TRUE KW_FALSE KW_ZEROINITIALIZER
+%token KW_NULL KW_UNDEF KW_TRUE KW_FALSE KW_ZEROINITIALIZER KW_C
 
 %token<string> LABEL
 
@@ -128,14 +128,14 @@ let is_externally_initialized l =
 %token KW_ATTRIBUTES
 %token<int> ATTR_GRP_ID
 
-%start<Ollvm_ast.toplevelentries> toplevelentries
+%start<Ollvm_ast.toplevel_entities> toplevel_entities
 
 %%
 
-toplevelentries:
-  | EOL* m=terminated(toplevelentry, EOL*)* EOF { m }
+toplevel_entities:
+  | EOL* m=terminated(toplevel_entity, EOL*)* EOF { m }
 
-toplevelentry:
+toplevel_entity:
   | d=definition                        { TLE_Definition d               }
   | d=declaration                       { TLE_Declaration d              }
   | KW_TARGET KW_DATALAYOUT EQ s=STRING { TLE_Datalayout s               }
@@ -170,18 +170,41 @@ instr_metadata:
 
 global_decl:
   | ident=GLOBAL EQ
-      attrs=global_attr*
-      g_constant=global_is_constant
-      g_typ=typ
-      g_value=const?
-      opt=preceded(COMMA, separated_list(COMMA, global_attr))?
+    el=external_linkage
+    attrs=global_attr*
+    g_constant=global_is_constant
+    g_typ=typ
+    opt=preceded(COMMA, separated_list(COMMA, global_attr))?
       { let opt = match opt with Some o -> o | None -> [] in
         { g_ident=ID_Global ident;
           g_typ;
           g_constant;
-          g_value;
 
-          g_linkage = get_linkage attrs;
+	  g_value = None;
+          g_linkage = Some el;
+          g_visibility = get_visibility attrs;
+          g_dll_storage = get_dll_storage attrs;
+          g_thread_local = get_thread_local attrs;
+          g_unnamed_addr = is_unnamed_addr attrs;
+          g_addrspace = get_addrspace attrs;
+          g_externally_initialized = is_externally_initialized attrs;
+          g_section = get_section opt;
+          g_align = get_align opt; } }
+  
+  | ident=GLOBAL EQ
+    g_linkage=nonexternal_linkage?
+    attrs=global_attr*
+    g_constant=global_is_constant
+    g_typ=typ
+    gv=value
+    opt=preceded(COMMA, separated_list(COMMA, global_attr))?
+      { let opt = match opt with Some o -> o | None -> [] in
+        { g_ident=ID_Global ident;
+          g_typ;
+          g_constant;
+          g_value = Some gv;
+
+          g_linkage;
           g_visibility = get_visibility attrs;
           g_dll_storage = get_dll_storage attrs;
           g_thread_local = get_thread_local attrs;
@@ -196,7 +219,6 @@ global_is_constant:
   | KW_CONSTANT { true }
 
 global_attr:
-  | a=linkage                           { OPT_linkage a              }
   | a=visibility                        { OPT_visibility a           }
   | a=dll_storage                       { OPT_dll_storage a          }
   | KW_THREAD_LOCAL LPAREN t=tls RPAREN { OPT_thread_local t         }
@@ -290,6 +312,20 @@ df_post_attr:
   | a=align                              { OPT_align a       }
   | KW_GC a=STRING                       { OPT_gc a          }
                                          (* TODO: prefix *)
+external_linkage:
+  | KW_EXTERN_WEAK                  { LINKAGE_Extern_weak                  }
+  | KW_EXTERNAL                     { LINKAGE_External                     }
+
+nonexternal_linkage:
+  | KW_PRIVATE                      { LINKAGE_Private                      }
+  | KW_INTERNAL                     { LINKAGE_Internal                     }
+  | KW_AVAILABLE_EXTERNALLY         { LINKAGE_Available_externally         }
+  | KW_LINKONCE                     { LINKAGE_Linkonce                     }
+  | KW_WEAK                         { LINKAGE_Weak                         }
+  | KW_COMMON                       { LINKAGE_Common                       }
+  | KW_APPENDING                    { LINKAGE_Appending                    }
+  | KW_LINKONCE_ODR                 { LINKAGE_Linkonce_odr                 }
+  | KW_WEAK_ODR                     { LINKAGE_Weak_odr                     }
 
 linkage:
   | KW_PRIVATE                      { LINKAGE_Private                      }
@@ -449,9 +485,8 @@ instr:
   | c=conversion t1=typ v=value KW_TO t2=typ
     { INSTR_Conversion (c, t1, v, t2) }
 
-  | KW_GETELEMENTPTR ?KW_INBOUNDS ptr=tvalue
-    idx=preceded(COMMA, tvalue)*
-    { INSTR_GetElementPtr (ptr, idx) }
+  | KW_GETELEMENTPTR KW_INBOUNDS? t=typ COMMA ptr=tvalue idx=preceded(COMMA, tvalue)*
+    { INSTR_GetElementPtr (t, ptr, idx) }
 
   | KW_TAIL? KW_CALL cconv? list(param_attr) f=tident
     a=delimited(LPAREN, separated_list(COMMA, call_arg), RPAREN)
@@ -462,8 +497,8 @@ instr:
     { let (n, a) = match opt with Some x -> x | None -> (None, None) in
       INSTR_Alloca (t, n, a) }
 
-  | KW_LOAD vol=KW_VOLATILE? tv=tvalue a=preceded(COMMA, align)?
-    { INSTR_Load (vol<>None, tv, a) }
+  | KW_LOAD vol=KW_VOLATILE? t=typ COMMA tv=tvalue a=preceded(COMMA, align)?
+    { INSTR_Load (vol<>None, t, tv, a) }
 
   | KW_PHI t=typ table=separated_nonempty_list(COMMA, phi_table_entry)
     { INSTR_Phi (t, table) }
@@ -555,10 +590,12 @@ const:
   | LTLCURLY l=separated_list(COMMA, tconst) RCURLYGT { VALUE_Struct l         }
   | LSQUARE l=separated_list(COMMA, tconst) RSQUARE   { VALUE_Array l          }
   | LT l=separated_list(COMMA, tconst) GT             { VALUE_Vector l         }
+  | i=ident                                           { VALUE_Ident i          }
+  | KW_C cstr=STRING                                  { VALUE_Cstring cstr     }
 
 value:
   | c=const { c             }
-  | i=ident { VALUE_Ident i }
+
 
 lident:
   | l=LOCAL  { l }
@@ -567,7 +604,7 @@ gident:
   | g=GLOBAL  { g }
 
 ident:
-  | l=gident { ID_Global l }
+  | l=gident  { ID_Global l }
   | l=lident  { ID_Local l  }
 
 tvalue: t=typ v=value { (t, v) }
