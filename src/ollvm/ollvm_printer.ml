@@ -152,7 +152,7 @@ and typ : Format.formatter -> Ollvm_ast.typ -> unit =
   | TYPE_Metadata         -> fprintf ppf "metadata"
   | TYPE_X86_mmx          -> assert false
   | TYPE_Array (i, t)     -> fprintf ppf "[%d x %a]" i typ t ;
-  | TYPE_Function (t, tl) -> assert false (* (t, tl) : Format.formatter -> (typ * typ list) *)
+  | TYPE_Function (t, tl) -> fprintf ppf "%a (%a)" typ t (pp_print_list ~pp_sep:pp_comma_space typ) tl
   | TYPE_Struct tl        -> fprintf ppf "{%a}"
                                      (pp_print_list ~pp_sep:pp_comma_space typ) tl
   | TYPE_Packed_struct tl -> fprintf ppf "<{%a}>"
