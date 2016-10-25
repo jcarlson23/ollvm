@@ -173,7 +173,7 @@ and icmp : Format.formatter -> Ollvm_ast.icmp -> unit =
                 | Sgt -> "sgt"
                 | Sge -> "sge"
                 | Slt -> "slt"
-                | Sle -> "cmp")
+                | Sle -> "sle")
 
 and fcmp : Format.formatter -> Ollvm_ast.fcmp -> unit =
   fun ppf fcmp ->
@@ -444,12 +444,13 @@ and toplevel_entity : t -> Format.formatter -> Ollvm_ast.toplevel_entity -> unit
   function
   | TLE_Target s               -> fprintf ppf "target triple = \"%s\"" s
   | TLE_Datalayout s           -> fprintf ppf "target datalayout = \"%s\"" s
+  | TLE_Source_filename s      -> fprintf ppf "source_filename = \"%s\"" s
   | TLE_Declaration d          -> declaration env ppf d
   | TLE_Definition d           -> definition env ppf d
   | TLE_Type_decl (i, t)       -> fprintf ppf "%a = type %a" (ident env) i typ t
   | TLE_Global g               -> global env ppf g
   | TLE_Metadata (i, m)        -> fprintf ppf "!%s = %a" i (metadata env) m
-  | TLE_Attribute_group (i, a) -> fprintf ppf "#%d = { %a }" i
+  | TLE_Attribute_group (i, a) -> fprintf ppf "attributes #%d = { %a }" i
                                           (pp_print_list ~pp_sep:pp_space fn_attr) a
 
 and metadata : t -> Format.formatter -> Ollvm_ast.metadata -> unit =
@@ -458,8 +459,8 @@ and metadata : t -> Format.formatter -> Ollvm_ast.metadata -> unit =
   | METADATA_Const v  -> tvalue env ppf v
   | METADATA_Null     -> pp_print_string ppf "null"
   | METADATA_Id i     -> fprintf ppf "!%s" i
-  | METADATA_String s -> fprintf ppf "metadata !\"%s\"" s
-  | METADATA_Node m   -> fprintf ppf "metadata !{%a}"
+  | METADATA_String s -> fprintf ppf "!%s" s
+  | METADATA_Node m   -> fprintf ppf "!{%a}"
                                  (pp_print_list ~pp_sep:pp_comma_space (metadata env)) m
   | METADATA_Named m  -> fprintf ppf "!{%a}"
                                  (pp_print_list ~pp_sep:pp_comma_space
@@ -469,15 +470,20 @@ and metadata : t -> Format.formatter -> Ollvm_ast.metadata -> unit =
 and global : t -> Format.formatter -> Ollvm_ast.global -> unit =
   fun env ppf ->
   fun {
-    g_ident = i;
-    g_typ = t;
-    g_constant = b;
+    g_ident;
+    g_typ;
+    g_constant;
+    g_value;
+
+    g_linkage = linkage;
+    g_visibility = visibility;
+    g_dll_storage = gdll;
+
     g_section = s;
     g_align = a;
-    g_value = vo;
   } -> fprintf ppf "%a = %s %a"
-               (ident env) i (if b then "constant" else "global") typ t ;
-       (match vo with None -> () | Some v -> (pp_print_string ppf " "; (value env) ppf v)) ;
+               (ident env) g_ident (if g_constant then "constant" else "global") typ g_typ ;
+       (match g_value with None -> () | Some v -> (pp_print_string ppf " "; (value env) ppf v)) ;
        (match s with None -> ()
                    | Some s -> fprintf ppf ", section %s" s) ;
        (match a with None -> ()
@@ -559,8 +565,8 @@ and block : t -> Format.formatter -> Ollvm_ast.block -> unit =
       | BAnon i -> fprintf ppf "; <label> %d" i
       | BName s -> (pp_print_string ppf s; pp_print_char ppf ':')
     end;
-    pp_open_box ppf 2 ;
     pp_force_newline ppf () ;
+    pp_open_box ppf 2 ;
     pp_print_list ~pp_sep:pp_force_newline (instr env) ppf b ;
     pp_close_box ppf ()
 

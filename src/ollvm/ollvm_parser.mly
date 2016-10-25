@@ -98,7 +98,7 @@ let is_externally_initialized l =
 
 %token<string> LABEL
 
-%token KW_DEFINE KW_DECLARE KW_TARGET KW_DATALAYOUT KW_TRIPLE
+%token KW_DEFINE KW_DECLARE KW_TARGET KW_DATALAYOUT KW_TRIPLE KW_SOURCE_FILENAME
 %token KW_PRIVATE KW_INTERNAL KW_AVAILABLE_EXTERNALLY KW_LINKONCE KW_WEAK KW_COMMON KW_APPENDING KW_EXTERN_WEAK KW_LINKONCE_ODR KW_WEAK_ODR KW_EXTERNAL KW_DLLIMPORT KW_DLLEXPORT
 %token KW_DEFAULT KW_HIDDEN KW_PROTECTED
 %token KW_CCC KW_FASTCC KW_COLDCC KW_CC
@@ -140,7 +140,8 @@ toplevel_entity:
   | d=declaration                       { TLE_Declaration d              }
   | KW_TARGET KW_DATALAYOUT EQ s=STRING { TLE_Datalayout s               }
   | KW_TARGET KW_TRIPLE EQ s=STRING     { TLE_Target s                   }
-  | i=LOCAL EQ KW_TYPE t=typ            { TLE_Type_decl (ID_Local i, t) }
+  | KW_SOURCE_FILENAME EQ s=STRING      { TLE_Source_filename s          }
+  | i=LOCAL EQ KW_TYPE t=typ            { TLE_Type_decl (ID_Local i, t)  }
   | g=global_decl                       { TLE_Global g                   }
   | i=METADATA_ID EQ m=tle_metadata     { TLE_Metadata (i, m)            }
   | KW_ATTRIBUTES i=ATTR_GRP_ID EQ LCURLY a=fn_attr* RCURLY
@@ -148,8 +149,8 @@ toplevel_entity:
 
 (* metadata are not implemented yet, but are at least (partially) parsed *)
 tle_metadata:
-  | BANGLCURLY m=separated_list(csep, METADATA_ID) RCURLY
-   { METADATA_Named m }
+  | BANGLCURLY m=separated_list(csep, metadata_value) RCURLY
+   { METADATA_Node m }
   | KW_METADATA m=metadata_node
     { m }
 
@@ -160,13 +161,10 @@ metadata_node:
 metadata_value:
   | tconst                      { METADATA_Const $1  }
   | KW_NULL                     { METADATA_Null      } (* null with no type *)
-  | KW_METADATA METADATA_STRING { METADATA_String $2 }
-  | KW_METADATA METADATA_ID     { METADATA_Id $2     }
-  | KW_METADATA metadata_node   { $2                 }
+  | ms=METADATA_STRING          { METADATA_String ms }
+  | mid=METADATA_ID             { METADATA_Id mid     }
+  | mn=metadata_node            { mn                 }
 
-instr_metadata:
-  | METADATA_ID METADATA_ID
-  {  }
 
 global_decl:
   | ident=GLOBAL EQ

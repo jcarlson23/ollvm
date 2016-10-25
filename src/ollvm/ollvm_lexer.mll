@@ -26,6 +26,7 @@
   let kw = function
   | "target"                       -> KW_TARGET
   | "datalayout"                   -> KW_DATALAYOUT
+  | "source_filename"              -> KW_SOURCE_FILENAME
   | "triple"                       -> KW_TRIPLE
   | "define"                       -> KW_DEFINE
   | "declare"                      -> KW_DECLARE
@@ -244,7 +245,7 @@ let alphanum = digit | letter
 let ident_fst  = letter   | ['-' '$' '.' '_']
 let ident_nxt  = alphanum | ['-' '$' '.' '_']
 let label_char = alphanum | ['-' '$' '.' '_']
-
+let kwletter   = alphanum | ['_']
 
 rule token = parse
   (* seps and stuff *)
@@ -294,7 +295,7 @@ rule token = parse
   | '*' { STAR }
 
   (* keywords *)
-  | alphanum+ as a { kw a }
+  | kwletter+ as a { kw a }
 
 and comment = parse
   | eol { Lexing.new_line lexbuf; EOL }
