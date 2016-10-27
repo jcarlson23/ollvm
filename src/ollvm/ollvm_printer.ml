@@ -250,25 +250,44 @@ and conversion_type : Format.formatter -> Ollvm_ast.conversion_type -> unit =
                | Ptrtoint -> "ptrtoint"
                | Bitcast  -> "bitcast")
 
-and instr : t -> Format.formatter -> Ollvm_ast.instr -> unit =
+and value : t -> Format.formatter -> Ollvm_ast.value -> unit =
   fun env ppf ->
   function
+  | VALUE_Ident i           -> ident env ppf i
+  | VALUE_Integer i         -> pp_print_int ppf i
+  | VALUE_Float f           -> pp_print_float ppf f
+  | VALUE_Bool b            -> pp_print_bool ppf b
+  | VALUE_Null              -> pp_print_string ppf "null"
+  | VALUE_Undef             -> pp_print_string ppf "undef"
+  | VALUE_Array tvl         -> fprintf ppf "[%a]"
+                                       (pp_print_list ~pp_sep:pp_comma_space (tvalue env)) tvl
+  | VALUE_Vector tvl        -> fprintf ppf "<%a>"
+                                       (pp_print_list ~pp_sep:pp_comma_space (tvalue env)) tvl
+  | VALUE_Struct tvl        -> fprintf ppf "{%a}"
+                                       (pp_print_list ~pp_sep:pp_comma_space (tvalue env)) tvl
+  | VALUE_Packed_struct tvl -> fprintf ppf "<{%a}>"
+                                       (pp_print_list ~pp_sep:pp_comma_space (tvalue env)) tvl
+  | VALUE_Zero_initializer  -> pp_print_string ppf "zeroinitializer"
 
-  | INSTR_IBinop (op, t, v1, v2) ->
+  | VALUE_Cstring s -> fprintf ppf "c\"%s\"" s
+
+  | VALUE_None -> fprintf ppf "none"
+  
+  | OP_IBinop (op, t, v1, v2) ->
      fprintf ppf "%a %a %a, %a"
              ibinop op
              typ t
              (value env) v1
              (value env) v2
 
-  | INSTR_ICmp (c, t, v1, v2) ->
+  | OP_ICmp (c, t, v1, v2) ->
      fprintf ppf "icmp %a %a %a, %a"
              icmp c
              typ t
              (value env) v1
              (value env) v2
 
-  | INSTR_FBinop (op, f, t, v1, v2) ->
+  | OP_FBinop (op, f, t, v1, v2) ->
      fbinop ppf op ;
      if f <> [] then (pp_space ppf () ;
                       pp_print_list ~pp_sep:pp_space fast_math ppf f) ;
@@ -277,25 +296,66 @@ and instr : t -> Format.formatter -> Ollvm_ast.instr -> unit =
              (value env) v1
              (value env) v2
 
-  | INSTR_FCmp (c, t, v1, v2) ->
+  | OP_FCmp (c, t, v1, v2) ->
      fprintf ppf "fcmp %a %a %a, %a"
              fcmp c
              typ t
              (value env) v1
              (value env) v2
 
-  | INSTR_Conversion (c, t1, v, t2) ->
+  | OP_Conversion (c, t1, v, t2) ->
      fprintf ppf "%a %a %a to %a"
              conversion_type c
              typ t1
              (value env) v
              typ t2
 
-  | INSTR_GetElementPtr (t, tv, tvl) ->
+  | OP_GetElementPtr (t, tv, tvl) ->
     fprintf ppf "getelementptr %a, %a, %a"
              typ t
              (tvalue env) tv
              (pp_print_list ~pp_sep:pp_comma_space (tvalue env)) tvl
+
+  | OP_Select (if_, then_, else_) ->
+     fprintf ppf "select %a, %a, %a"
+             (tvalue env) if_
+             (tvalue env) then_
+             (tvalue env) else_
+
+  | OP_ExtractElement (vec, idx) ->
+     fprintf ppf "extractelement %a, %a"
+             (tvalue env) vec
+             (tvalue env) idx
+
+  | OP_InsertElement (vec, new_val, idx) ->
+     fprintf ppf "insertelement %a, %a, %a"
+             (tvalue env) vec
+             (tvalue env) new_val
+             (tvalue env) idx
+
+  | OP_ExtractValue (agg, idx) ->
+     fprintf ppf "extractvalue %a, %a"
+             (tvalue env) agg
+             (pp_print_list ~pp_sep:pp_comma_space pp_print_int) idx
+
+  | OP_InsertValue (agg, new_val, idx) ->
+     fprintf ppf "insertvalue %a, %a, %a"
+             (tvalue env) agg
+             (tvalue env) new_val
+             (pp_print_list ~pp_sep:pp_comma_space pp_print_int) idx
+
+  | OP_ShuffleVector (v1, v2, mask) ->
+     fprintf ppf "shufflevector %a, %a, %a"
+             (tvalue env) v1
+             (tvalue env) v2
+             (tvalue env) mask
+
+
+and instr : t -> Format.formatter -> Ollvm_ast.instr -> unit =
+  fun env ppf ->
+  function
+
+  | INSTR_Op v -> value env ppf v
 
   | INSTR_Call (ti, tvl) ->
      fprintf ppf "call %a(%a)"
@@ -326,41 +386,10 @@ and instr : t -> Format.formatter -> Ollvm_ast.instr -> unit =
                                                pp_print_string ppf ", " ;
                                                ident env ppf i)) vil
 
-  | INSTR_Select (if_, then_, else_) ->
-     fprintf ppf "select %a, %a, %a"
-             (tvalue env) if_
-             (tvalue env) then_
-             (tvalue env) else_
 
   | INSTR_VAArg -> pp_print_string ppf "vaarg"
 
-  | INSTR_ExtractElement (vec, idx) ->
-     fprintf ppf "extractelement %a, %a"
-             (tvalue env) vec
-             (tvalue env) idx
 
-  | INSTR_InsertElement (vec, new_val, idx) ->
-     fprintf ppf "insertelement %a, %a, %a"
-             (tvalue env) vec
-             (tvalue env) new_val
-             (tvalue env) idx
-
-  | INSTR_ExtractValue (agg, idx) ->
-     fprintf ppf "extractvalue %a, %a"
-             (tvalue env) agg
-             (pp_print_list ~pp_sep:pp_comma_space pp_print_int) idx
-
-  | INSTR_InsertValue (agg, new_val, idx) ->
-     fprintf ppf "insertvalue %a, %a, %a"
-             (tvalue env) agg
-             (tvalue env) new_val
-             (pp_print_list ~pp_sep:pp_comma_space pp_print_int) idx
-
-  | INSTR_ShuffleVector (v1, v2, mask) ->
-     fprintf ppf "shufflevector %a, %a, %a"
-             (tvalue env) v1
-             (tvalue env) v2
-             (tvalue env) mask
 
   | INSTR_LandingPad -> assert false
 
@@ -409,27 +438,18 @@ and instr : t -> Format.formatter -> Ollvm_ast.instr -> unit =
              (tident env) i2
              (tident env) i3
 
-  | INSTR_Assign (id, inst) -> fprintf ppf "%a = %a" (ident env) id (instr env) inst
-
-and value : t -> Format.formatter -> Ollvm_ast.value -> unit =
+and id_instr : t -> Format.formatter -> (Ollvm_ast.instr_id * Ollvm_ast.instr) -> unit =
   fun env ppf ->
-  function
-  | VALUE_Ident i           -> ident env ppf i
-  | VALUE_Integer i         -> pp_print_int ppf i
-  | VALUE_Float f           -> pp_print_float ppf f
-  | VALUE_Bool b            -> pp_print_bool ppf b
-  | VALUE_Null              -> pp_print_string ppf "null"
-  | VALUE_Undef             -> pp_print_string ppf "undef"
-  | VALUE_Array tvl         -> fprintf ppf "[%a]"
-                                       (pp_print_list ~pp_sep:pp_comma_space (tvalue env)) tvl
-  | VALUE_Vector tvl        -> fprintf ppf "<%a>"
-                                       (pp_print_list ~pp_sep:pp_comma_space (tvalue env)) tvl
-  | VALUE_Struct tvl        -> fprintf ppf "{%a}"
-                                       (pp_print_list ~pp_sep:pp_comma_space (tvalue env)) tvl
-  | VALUE_Packed_struct tvl -> fprintf ppf "<{%a}>"
-                                       (pp_print_list ~pp_sep:pp_comma_space (tvalue env)) tvl
-  | VALUE_Zero_initializer  -> pp_print_string ppf "zeroinitializer"
-  | VALUE_Cstring s -> fprintf ppf "c\"%s\"" s
+    function (id, inst) ->
+      fprintf ppf "%a%a" (instr_id env) id (instr env) inst
+
+and instr_id : t -> Format.formatter -> Ollvm_ast.instr_id -> unit =
+  fun env ppf ->
+    function
+    | IAnon n -> fprintf ppf "%%%d = " n
+    | IName s -> fprintf ppf "%%%s = " s
+    | IVoid n -> fprintf ppf ""
+  
 
 and tvalue env ppf (t, v) = fprintf ppf "%a %a" typ t (value env) v
 
@@ -566,8 +586,9 @@ and block : t -> Format.formatter -> Ollvm_ast.block -> unit =
       | BName s -> (pp_print_string ppf s; pp_print_char ppf ':')
     end;
     pp_force_newline ppf () ;
-    pp_open_box ppf 2 ;
-    pp_print_list ~pp_sep:pp_force_newline (instr env) ppf b ;
+    pp_print_string ppf "  ";
+    pp_open_box ppf 0 ;
+    pp_print_list ~pp_sep:pp_force_newline (id_instr env) ppf b ;
     pp_close_box ppf ()
 
 and modul : t -> Format.formatter -> Ollvm_ast.modul -> unit =

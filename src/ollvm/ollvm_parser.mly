@@ -86,6 +86,46 @@ let is_unnamed_addr l =
 let is_externally_initialized l =
   None <> get_opt (function OPT_externally_initialized -> Some () | _ -> None) l
 
+type ctr = {get : unit -> int; reset : unit -> unit}
+  
+let mk_counter () =
+  let c = ref 0 in
+  {
+    get = (fun () -> let cnt = !c in incr c; cnt);
+    reset = (fun () -> c := 0);
+  }
+
+let anon_ctr = mk_counter ()
+let void_ctr = mk_counter ()             
+  
+  
+let id_of = function
+  | INSTR_Store _
+  | INSTR_Invoke _
+  | INSTR_Ret _
+  | INSTR_Ret_void
+  | INSTR_Br _
+  | INSTR_Br_1 _
+  | INSTR_Switch _
+  | INSTR_IndirectBr _
+  | INSTR_Resume _
+  | INSTR_Unreachable
+  | INSTR_Fence
+  | INSTR_Call ((TYPE_Void, _), _)
+    -> IVoid (void_ctr.get ())
+
+  | INSTR_Op _
+  | INSTR_Call _
+  | INSTR_Phi _
+  | INSTR_Alloca _
+  | INSTR_Load _
+  | INSTR_AtomicCmpXchg
+  | INSTR_AtomicRMW
+  | INSTR_VAArg
+  | INSTR_LandingPad
+    -> IAnon (anon_ctr.get ())
+
+
 %}
 
 %token<string> GLOBAL LOCAL
@@ -274,15 +314,19 @@ definition:
         } }
 
 df_blocks:
-  | bs=pair(terminated(LABEL, EOL+)?, terminated(instr, EOL+)+)*
-  { let aid = ref 0 in
-    let get () = let id = !aid in incr aid; id in
+  | bs=pair(terminated(LABEL, EOL+)?, terminated(id_instr, EOL+)+)*
+  { let _ = anon_ctr.reset () in
     List.map (fun (lbl, instrs) ->
-      ((match lbl with
-      | None -> BAnon (get ())
-      | Some s -> BName s),
-      instrs)) bs }
-
+    	     let l = match lbl with
+      	     	     | None -> BAnon (anon_ctr.get ())
+                     | Some s -> BName s
+	     in let iis = List.map (fun (id, inst) ->
+                                   match id with 
+                                   | None -> (id_of inst, inst)
+                                   | Some s -> (IName s, inst)
+              ) instrs in
+	      (l, iis))
+        bs }		     
 (*
   | hd_lbl=terminated(LABEL, EOL+)? hd=terminated(instr, EOL+)+
     tl=pair(terminated(LABEL, EOL+), terminated(instr, EOL+)+)*
@@ -469,22 +513,44 @@ fast_math:
 
 instr:
   | op=ibinop t=typ o1=value COMMA o2=value
-    { INSTR_IBinop (op, t, o1, o2) }
+    { INSTR_Op (OP_IBinop (op, t, o1, o2)) }
 
   | KW_ICMP op=icmp t=typ o1=value COMMA o2=value
-    { INSTR_ICmp (op, t, o1, o2) }
+    { INSTR_Op (OP_ICmp (op, t, o1, o2)) }
 
   | op=fbinop f=fast_math* t=typ o1=value COMMA o2=value
-    { INSTR_FBinop (op, f, t, o1, o2) }
+    { INSTR_Op (OP_FBinop (op, f, t, o1, o2)) }
 
   | KW_FCMP op=fcmp t=typ o1=value COMMA o2=value
-    { INSTR_FCmp (op, t, o1, o2) }
+    { INSTR_Op (OP_FCmp (op, t, o1, o2)) }
 
   | c=conversion t1=typ v=value KW_TO t2=typ
-    { INSTR_Conversion (c, t1, v, t2) }
+    { INSTR_Op (OP_Conversion (c, t1, v, t2)) }
 
   | KW_GETELEMENTPTR KW_INBOUNDS? t=typ COMMA ptr=tvalue idx=preceded(COMMA, tvalue)*
-    { INSTR_GetElementPtr (t, ptr, idx) }
+    { INSTR_Op (OP_GetElementPtr (t, ptr, idx)) }
+
+  | KW_SELECT if_=tvalue COMMA then_=tvalue COMMA else_= tvalue
+    { INSTR_Op (OP_Select (if_, then_, else_)) }
+
+  | KW_EXTRACTELEMENT vec=tvalue COMMA idx=tvalue
+    { INSTR_Op (OP_ExtractElement (vec, idx)) }
+
+  | KW_INSERTELEMENT vec=tvalue
+    COMMA new_el=tvalue COMMA idx=tvalue
+    { INSTR_Op (OP_InsertElement (vec, new_el, idx))  }
+
+  | KW_EXTRACTVALUE tv=tvalue COMMA
+    idx=separated_nonempty_list (csep, INTEGER)
+    { INSTR_Op (OP_ExtractValue (tv, idx)) }
+
+  | KW_INSERTVALUE agg=tvalue COMMA new_val=tvalue COMMA
+    idx=separated_nonempty_list (csep, INTEGER)
+    { INSTR_Op (OP_InsertValue (agg, new_val, idx)) }
+
+  | KW_SHUFFLEVECTOR v1=tvalue COMMA v2=tvalue COMMA mask=tvalue
+    { INSTR_Op (OP_ShuffleVector (v1, v2, mask))  }
+
 
   | KW_TAIL? KW_CALL cconv? list(param_attr) f=tident
     a=delimited(LPAREN, separated_list(csep, call_arg), RPAREN)
@@ -501,26 +567,6 @@ instr:
   | KW_PHI t=typ table=separated_nonempty_list(csep, phi_table_entry)
     { INSTR_Phi (t, table) }
 
-  | KW_SELECT if_=tvalue COMMA then_=tvalue COMMA else_= tvalue
-    { INSTR_Select (if_, then_, else_) }
-
-  | KW_EXTRACTELEMENT vec=tvalue COMMA idx=tvalue
-    { INSTR_ExtractElement (vec, idx) }
-
-  | KW_INSERTELEMENT vec=tvalue
-    COMMA new_el=tvalue COMMA idx=tvalue
-    { INSTR_InsertElement (vec, new_el, idx)  }
-
-  | KW_EXTRACTVALUE tv=tvalue COMMA
-    idx=separated_nonempty_list (csep, INTEGER)
-    { INSTR_ExtractValue (tv, idx) }
-
-  | KW_INSERTVALUE agg=tvalue COMMA new_val=tvalue COMMA
-    idx=separated_nonempty_list (csep, INTEGER)
-    { INSTR_InsertValue (agg, new_val, idx) }
-
-  | KW_SHUFFLEVECTOR v1=tvalue COMMA v2=tvalue COMMA mask=tvalue
-    { INSTR_ShuffleVector (v1, v2, mask)  }
 
   | KW_VAARG  { failwith"INSTR_VAArg"  }
   | KW_LANDINGPAD    { failwith"INSTR_LandingPad"    }
@@ -564,7 +610,9 @@ instr:
     list(fn_attr) KW_TO l1=tident KW_UNWIND l2=tident
     { INSTR_Invoke (ret, a, l1, l2)  }
 
-  | i=ident EQ inst=instr { INSTR_Assign (i, inst) }
+id_instr:
+  | id=lident EQ inst=instr { (Some id, inst) }
+  | inst=instr              { (None, inst) }
 
 alloca_opt:
   | a=align                             { (None, Some a) }
@@ -579,7 +627,7 @@ switch_table_entry:
 csep:
   COMMA EOL* { () }
 
-const:
+value:
   | i=INTEGER                                         { VALUE_Integer i        }
   | f=FLOAT                                           { VALUE_Float f          }
   | KW_TRUE                                           { VALUE_Bool true        }
@@ -594,10 +642,6 @@ const:
   | i=ident                                           { VALUE_Ident i          }
   | KW_C cstr=STRING                                  { VALUE_Cstring cstr     }
 
-value:
-  | c=const { c             }
-
-
 lident:
   | l=LOCAL  { l }
 
@@ -609,5 +653,5 @@ ident:
   | l=lident  { ID_Local l  }
 
 tvalue: t=typ v=value { (t, v) }
-tconst: t=typ c=const { (t, c) }
+tconst: t=typ c=value { (t, c) }
 tident: t=typ i=ident { (t, i) }

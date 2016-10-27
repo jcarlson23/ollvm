@@ -184,12 +184,12 @@ module Instr : sig
   (** [ret_void] returns with no value. *)
   val ret_void : Ollvm_ast.instr
 
-  (** Binds a [t] to an identifier.
-      i. e. build a [ollvm] assignment instruction. *)
-  val assign : Value.t -> t -> Ollvm_ast.instr
+  (* (\** Binds a [t] to an identifier. *)
+  (*     i. e. build a [ollvm] assignment instruction. *\) *)
+  (* val assign : Value.t -> t -> Ollvm_ast.instr *)
 
-  (** Infix operator equivalent to [assign] function. *)
-  val ( <-- ) : Value.t -> t -> Ollvm_ast.instr
+  (* (\** Infix operator equivalent to [assign] function. *\) *)
+  (* val ( <-- ) : Value.t -> t -> Ollvm_ast.instr *)
 
   (** Converts a [t] into a [ollvm] instr. *)
   val ignore : t -> Ollvm_ast.instr
@@ -199,7 +199,7 @@ end
 (** Function and block creation. *)
 module Block : sig
 
-  type block = Ollvm_ast.ident * (Ollvm_ast.instr list)
+  type block = Ollvm_ast.ident * ((Ollvm_ast.instr_id * Ollvm_ast.instr) list)
 
   (** [declare (ret_ty, fn) args_ty] declares [fn] as a function
       returning [ret_ty] and requiring arguments of types [args_ty]. *)
@@ -210,7 +210,7 @@ module Block : sig
   val define : Value.t -> Value.t list -> block list -> Ollvm_ast.definition
 
   (** [block label instrs] binds [instrs] to [label], creating a [block]. *)
-  val block : Value.t -> Ollvm_ast.instr list -> block
+  val block : Value.t -> (Ollvm_ast.instr_id * Ollvm_ast.instr) list -> block
 
 end
 

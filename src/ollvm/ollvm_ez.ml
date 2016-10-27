@@ -62,7 +62,7 @@ module Instr = struct
     (t, Ollvm_ast.INSTR_Phi (t, value_label))
 
   let select tcond (t, v1) tv2 =
-    (t, Ollvm_ast.INSTR_Select (tcond, (t, v1), tv2))
+    (t, Ollvm_ast.INSTR_Op (Ollvm_ast.OP_Select (tcond, (t, v1), tv2)))
 
   let alloca ?(nb=None) ?(align=None) t =
     (Type.pointer t, Ollvm_ast.INSTR_Alloca (t, nb, align))
@@ -75,7 +75,7 @@ module Instr = struct
     (Type.void, Ollvm_ast.INSTR_Store (volatile, value, ident pointer, align))
 
   let icmp cmp (t, op1) (_, op2) =
-    (Type.i1, Ollvm_ast.INSTR_ICmp (cmp, t, op1, op2))
+    (Type.i1, Ollvm_ast.INSTR_Op (Ollvm_ast.OP_ICmp (cmp, t, op1, op2)))
 
   let eq = icmp Ollvm_ast.Eq let ne = icmp Ollvm_ast.Ne
   let ugt = icmp Ollvm_ast.Ugt let uge = icmp Ollvm_ast.Uge
@@ -84,7 +84,7 @@ module Instr = struct
   let slt = icmp Ollvm_ast.Slt let sle = icmp Ollvm_ast.Sle
 
   let fcmp cmp (t, op1) (_, op2) =
-    (Type.i1, Ollvm_ast.INSTR_FCmp (cmp, t, op1, op2))
+    (Type.i1, Ollvm_ast.INSTR_Op (Ollvm_ast.OP_FCmp (cmp, t, op1, op2)))
 
   let ffalse = fcmp Ollvm_ast.FFalse let foeq = fcmp Ollvm_ast.FOeq
   let fogt = fcmp Ollvm_ast.FOgt let foge = fcmp Ollvm_ast.FOge
@@ -96,7 +96,7 @@ module Instr = struct
   let funo = fcmp Ollvm_ast.FUno let ftrue = fcmp Ollvm_ast.FTrue
 
   let ibinop b (t, op1) (_, op2) =
-    (t, Ollvm_ast.INSTR_IBinop (b, t, op1, op2))
+    (t, Ollvm_ast.INSTR_Op(Ollvm_ast.OP_IBinop (b, t, op1, op2)))
 
   let add ?(nsw=false) ?(nuw=false) = ibinop (Ollvm_ast.Add (nsw, nuw))
   let sub ?(nsw=false) ?(nuw=false) = ibinop (Ollvm_ast.Sub (nsw, nuw))
@@ -113,7 +113,7 @@ module Instr = struct
   let xor = ibinop Ollvm_ast.Xor
 
   let fbinop b ?(flags=[])  (t, op1) (_, op2) =
-    (t, Ollvm_ast.INSTR_FBinop (b, flags, t, op1, op2))
+    (t, Ollvm_ast.INSTR_Op(Ollvm_ast.OP_FBinop (b, flags, t, op1, op2)))
 
   let fadd = fbinop Ollvm_ast.FAdd
   let fsub = fbinop Ollvm_ast.FSub
@@ -123,28 +123,32 @@ module Instr = struct
 
   let extractelement vec idx =
     let (Ollvm_ast.TYPE_Vector (n, t), _) = vec in
-    (t, Ollvm_ast.INSTR_ExtractElement (vec, idx))
+    (t, Ollvm_ast.INSTR_Op(Ollvm_ast.OP_ExtractElement (vec, idx)))
 
   let insertelement vec el idx =
-    (fst vec, Ollvm_ast.INSTR_InsertElement (vec, el, idx))
+    (fst vec, Ollvm_ast.INSTR_Op(Ollvm_ast.OP_InsertElement (vec, el, idx)))
 
   let shufflevector v1 v2 vmask =
     let (vec_t, _) = v1 in
-    (vec_t, Ollvm_ast.INSTR_ShuffleVector (v1, v2, vmask))
+    (vec_t, Ollvm_ast.INSTR_Op(Ollvm_ast.OP_ShuffleVector (v1, v2, vmask)))
 
-  let convert op (t, v) t' = (t', Ollvm_ast.INSTR_Conversion(op, t, v, t'))
+  let convert op (t, v) t' = (t', Ollvm_ast.INSTR_Op(Ollvm_ast.OP_Conversion(op, t, v, t')))
 
-  let trunc = convert Ollvm_ast.Trunc let zext = convert Ollvm_ast.Zext
-  let sext = convert Ollvm_ast.Sext let fptrunc = convert Ollvm_ast.Fptrunc
-  let fpext = convert Ollvm_ast.Fpext let fptoui = convert Ollvm_ast.Fptoui
-  let fptosi = convert Ollvm_ast.Fptosi let uitofp = convert Ollvm_ast.Uitofp
+  let trunc = convert Ollvm_ast.Trunc
+  let zext = convert Ollvm_ast.Zext
+  let sext = convert Ollvm_ast.Sext
+  let fptrunc = convert Ollvm_ast.Fptrunc
+  let fpext = convert Ollvm_ast.Fpext
+  let fptoui = convert Ollvm_ast.Fptoui
+  let fptosi = convert Ollvm_ast.Fptosi
+  let uitofp = convert Ollvm_ast.Uitofp
   let sitofp = convert Ollvm_ast.Sitofp
 
   let extractvalue agg idx =
-    (fst agg, Ollvm_ast.INSTR_ExtractValue (agg, idx))
+    (fst agg, Ollvm_ast.INSTR_Op(Ollvm_ast.OP_ExtractValue (agg, idx)))
 
   let insertvalue agg el idx =
-    (fst agg, Ollvm_ast.INSTR_InsertValue (agg, el, idx))
+    (fst agg, Ollvm_ast.INSTR_Op(Ollvm_ast.OP_InsertValue (agg, el, idx)))
 
   let br cond (t, Ollvm_ast.VALUE_Ident then_) (t', Ollvm_ast.VALUE_Ident else_) =
     Ollvm_ast.INSTR_Br (cond, (t, then_), (t', else_))
@@ -163,11 +167,11 @@ module Instr = struct
 
   let ret_void = Ollvm_ast.INSTR_Ret_void
 
-  let assign id (_, expr) =
-    let (_, id) = ident id in
-    Ollvm_ast.INSTR_Assign (id, expr)
+  (* let assign id (_, expr) = *)
+  (*   let (_, id) = ident id in *)
+  (*   Ollvm_ast.INSTR_Assign (id, expr) *)
 
-  let ( <-- ) tid texpr = assign tid texpr
+  (* let ( <-- ) tid texpr = assign tid texpr *)
 
   let ignore (_, expr) = expr
 
@@ -175,7 +179,7 @@ end
 
 module Block = struct
 
-  type block = Ollvm_ast.ident * (Ollvm_ast.instr list)
+  type block = Ollvm_ast.ident * ((Ollvm_ast.instr_id * Ollvm_ast.instr) list)
 
   let declare fn args_typ =
     let (t, id) = Value.ident fn in
