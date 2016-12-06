@@ -192,7 +192,7 @@ module Block = struct
     let args = List.map Value.ident args in
     let open Ollvm_ast in
     let extract_name = function
-      | Ollvm_ast.ID_Local s -> BName s
+      | Ollvm_ast.ID_Local (Name s) -> Name s
       | _ -> assert false in
 
     let blocks = List.map (fun (id, instrs) -> (extract_name id, instrs)) instrs
@@ -245,7 +245,7 @@ module Module = struct
                        named_counter = (name, 0) :: env.named_counter },
                      name)
       in
-      (env, (t, Ollvm_ast.VALUE_Ident (Ollvm_ast.ID_Local name)))
+      (env, (t, Ollvm_ast.VALUE_Ident (Ollvm_ast.ID_Local (Name name))))
 
   end
 
@@ -297,7 +297,7 @@ module Module = struct
     in loop m [] list
 
   let global m t name =
-    let ident = Ollvm_ast.ID_Global name in
+    let ident = Ollvm_ast.ID_Global (Name name) in
     let var = (t, Ollvm_ast.VALUE_Ident ident) in
     (m, var)
 
@@ -308,14 +308,14 @@ module Module = struct
     List.assoc name m.m_module.m_definitions
 
   let declaration m dc =
-    let Ollvm_ast.ID_Global name = dc.Ollvm_ast.dc_name in
+    let Ollvm_ast.ID_Global (Name name) = dc.Ollvm_ast.dc_name in
     { m with m_module = { m.m_module with
                           m_declarations = (name, dc)
                                            :: m.m_module.m_declarations } }
 
   let definition m df =
     let { Ollvm_ast.df_prototype = dc; _; } = df in
-    let Ollvm_ast.ID_Global name = dc.dc_name in
+    let Ollvm_ast.ID_Global (Name name) = dc.dc_name in
     { m with m_module = { m.m_module with
                           m_declarations = (name, dc)
                                            :: m.m_module.m_declarations ;

@@ -12,21 +12,20 @@ let lookup env id = List.assoc id env.mem
 
 let lookup_fn env (id : Ollvm.Ast.ident) : Llvm.llvalue = match id with
   | ID_Local _ -> assert false
-  | ID_Global i -> match Llvm.lookup_function i env.m with
+  | ID_Global (Name i) -> match Llvm.lookup_function i env.m with
                    | Some fn -> fn
                    | _ -> assert false
 
+let string_of_raw_id : Ollvm.Ast.raw_id -> string = function
+  | Name s -> s
+  | Anon i -> string_of_int i
+
 let string_of_ident : Ollvm.Ast.ident -> string = function
-  | ID_Local i -> i
-  | ID_Global i -> i
+  | ID_Local i -> string_of_raw_id i
+  | ID_Global i -> string_of_raw_id i
 
 let block_label_of_ident : Ollvm.Ast.ident -> Ollvm.Ast.block_label = function
-  | ID_Local i ->
-    begin try
-      let x = int_of_string i in BAnon x
-      with
-      | Failure _ -> BName i
-    end
+  | ID_Local i -> i
   | ID_Global i -> assert false
 
 let label : env -> Ollvm.Ast.ident -> Llvm.llbasicblock =
@@ -253,7 +252,8 @@ let rec value : env -> Ollvm.Ast.typ -> Ollvm.Ast.value -> Llvm.llvalue =
 
 let rec instr : env -> Ollvm.Ast.instr -> (env * Llvm.llvalue) =
   fun env ->
-  let open Llvm in
+    let open Llvm in failwith "unimplemented"
+(*    
   function
 
   | INSTR_IBinop (op, ty, v1, v2)       ->
@@ -412,12 +412,13 @@ let rec instr : env -> Ollvm.Ast.instr -> (env * Llvm.llvalue) =
   | INSTR_Assign (id, inst)             ->
      let (env, llv) = instr env inst in
      ({ env with mem = (id, llv) :: env.mem }, llv)
+*)
 
 let global : env -> Ollvm.Ast.global -> env =
   fun env g ->
   let llv = value env g.g_typ (match g.g_value with Some x -> x
                                                   | None -> assert false) in
-  let Ollvm.Ast.ID_Global name = g.g_ident in
+  let Ollvm.Ast.ID_Global (Name name) = g.g_ident in
   let llv = Llvm.define_global name llv env.m in
   {env with mem = (g.g_ident, llv) :: env.mem }
 
@@ -432,7 +433,7 @@ let declaration : env -> Ollvm.Ast.declaration -> env * Llvm.llvalue =
 let create_block : env -> Ollvm.Ast.block -> Llvm.llvalue -> env =
   fun env b fn ->
   if List.mem_assoc (fst b) env.labels then assert false ;
-  let bname = match (fst b) with BAnon _ -> "" | BName s -> s in
+  let bname = match (fst b) with Anon _ -> "" | Name s -> s in
   let llb = Llvm.append_block env.c bname fn in
   { env with labels = (fst b, llb) :: env.labels }
 
@@ -442,7 +443,7 @@ let block : env -> Ollvm.Ast.block -> env =
   let bb = List.assoc (fst block) env.labels in
   Llvm.position_at_end bb env.b;
   (* process instructions *)
-  let env = List.fold_left (fun env i -> instr env i |> fst) env (snd block) in
+  let env = List.fold_left (fun env i -> instr env (snd i) |> fst) env (snd block) in
   env
 
 let definition : env -> Ollvm.Ast.definition -> env =

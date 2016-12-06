@@ -123,12 +123,12 @@ let id_of = function
   | INSTR_AtomicRMW
   | INSTR_VAArg
   | INSTR_LandingPad
-    -> IAnon (anon_ctr.get ())
+    -> IId (Anon (anon_ctr.get ()))
 
 
 %}
 
-%token<string> GLOBAL LOCAL
+%token<Ollvm_ast.raw_id> GLOBAL LOCAL
 %token LPAREN RPAREN LCURLY RCURLY LTLCURLY RCURLYGT LSQUARE RSQUARE LT GT EQ COMMA EOF EOL STAR
 
 %token<string> STRING
@@ -162,7 +162,7 @@ let id_of = function
 %token KW_TAIL
 %token KW_VOLATILE
 
-%token<string> METADATA_ID
+%token<Ollvm_ast.raw_id> METADATA_ID
 %token<string> METADATA_STRING
 %token BANGLCURLY
 %token KW_ATTRIBUTES
@@ -319,12 +319,12 @@ df_blocks:
     let _ = void_ctr.reset () in
     List.map (fun (lbl, instrs) ->
     	     let l = match lbl with
-      	     	     | None -> BAnon (anon_ctr.get ())
-                     | Some s -> BName s
+      	     	     | None -> Anon (anon_ctr.get ())
+                     | Some s -> Name s
 	     in let iis = List.map (fun (id, inst) ->
                                    match id with 
                                    | None -> (id_of inst, inst)
-                                   | Some s -> (IName s, inst)
+                                   | Some s -> (IId s, inst)
               ) instrs in
 	      (l, iis))
         bs }		     

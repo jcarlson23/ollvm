@@ -270,15 +270,18 @@ rule token = parse
   | ((label_char)+) as l ':' { LABEL l }
 
   (* identifier *)
-  | '@' { GLOBAL (ident_body lexbuf) }
-  | '%' { LOCAL (ident_body lexbuf) }
+  | '@' { GLOBAL (raw_id lexbuf) }
+  | '%' { LOCAL (raw_id lexbuf) }
 
   (* FIXME: support metadata strings and struct. Parsed as identifier here. *)
   | "!{" { BANGLCURLY }
-  | '!'  { let id = ident_body lexbuf in
-           if id.[0] = '"' && id.[String.length id - 1] = '"'
-           then METADATA_STRING (id)
-           else METADATA_ID id
+  | '!'  { let rid = raw_id lexbuf in
+           begin match rid with 
+           | Ollvm_ast.Name id -> (if id.[0] = '"' && id.[String.length id - 1] = '"'
+               then METADATA_STRING (id)
+               else METADATA_ID rid)
+	   | Ollvm_ast.Anon _ -> METADATA_ID rid
+	   end
          }
 
   | '#' (digit+ as i) { ATTR_GRP_ID (int_of_string i) }
@@ -306,10 +309,10 @@ and string buf = parse
   | '"'    { Buffer.contents buf }
   | _ as c { Buffer.add_char buf c; string buf lexbuf }
 
-and ident_body = parse
-  | ident_fst ident_nxt* as i { i }
-  | digit+ as i               { i }
-  | '"'                       { "\"" ^ string (Buffer.create 10) lexbuf ^ "\"" }
+and raw_id = parse
+  | ident_fst ident_nxt* as i { Ollvm_ast.Name i }
+  | digit+ as i               { Ollvm_ast.Anon (int_of_string i) }
+  | '"'                       { Ollvm_ast.Name ("\"" ^ string (Buffer.create 10) lexbuf ^ "\"") }
 
 {
 

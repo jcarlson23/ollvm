@@ -123,6 +123,11 @@ and fn_attr : Format.formatter -> Ollvm_ast.fn_attr -> unit =
   | FNATTR_Key_value (k, v) -> fprintf ppf "\"%s\"=\"%s\"" k v
   | FNATTR_Attr_grp i       -> fprintf ppf "#%d" i
 
+and str_of_raw_id : Ollvm_ast.raw_id -> string =
+    function
+    | Anon i -> Printf.sprintf "%d" i
+    | Name s -> s
+
 and ident : t -> Format.formatter -> Ollvm_ast.ident -> unit =
 
   (* let ident_format : (string -> int) -> Format.formatter -> string -> unit = *)
@@ -132,8 +137,8 @@ and ident : t -> Format.formatter -> Ollvm_ast.ident -> unit =
 
   fun env ppf ->
   function
-  | ID_Global i -> pp_print_char ppf '@' ; pp_print_string ppf i
-  | ID_Local i  -> pp_print_char ppf '%' ; pp_print_string ppf i
+  | ID_Global i -> pp_print_char ppf '@' ; pp_print_string ppf (str_of_raw_id i)
+  | ID_Local i  -> pp_print_char ppf '%' ; pp_print_string ppf (str_of_raw_id i)
 
 
 and typ : Format.formatter -> Ollvm_ast.typ -> unit =
@@ -446,8 +451,7 @@ and id_instr : t -> Format.formatter -> (Ollvm_ast.instr_id * Ollvm_ast.instr) -
 and instr_id : t -> Format.formatter -> Ollvm_ast.instr_id -> unit =
   fun env ppf ->
     function
-    | IAnon n -> fprintf ppf "%%%d = " n
-    | IName s -> fprintf ppf "%%%s = " s
+    | IId id  -> fprintf ppf "%%%s = " (str_of_raw_id id)
     | IVoid n -> fprintf ppf "; void instr %d" n; pp_force_newline ppf ()
   
 
@@ -469,7 +473,7 @@ and toplevel_entity : t -> Format.formatter -> Ollvm_ast.toplevel_entity -> unit
   | TLE_Definition d           -> definition env ppf d
   | TLE_Type_decl (i, t)       -> fprintf ppf "%a = type %a" (ident env) i typ t
   | TLE_Global g               -> global env ppf g
-  | TLE_Metadata (i, m)        -> fprintf ppf "!%s = %a" i (metadata env) m
+  | TLE_Metadata (i, m)        -> fprintf ppf "!%s = %a" (str_of_raw_id i) (metadata env) m
   | TLE_Attribute_group (i, a) -> fprintf ppf "attributes #%d = { %a }" i
                                           (pp_print_list ~pp_sep:pp_space fn_attr) a
 
@@ -478,7 +482,7 @@ and metadata : t -> Format.formatter -> Ollvm_ast.metadata -> unit =
   function
   | METADATA_Const v  -> tvalue env ppf v
   | METADATA_Null     -> pp_print_string ppf "null"
-  | METADATA_Id i     -> fprintf ppf "!%s" i
+  | METADATA_Id i     -> fprintf ppf "!%s" (str_of_raw_id i)
   | METADATA_String s -> fprintf ppf "!%s" s
   | METADATA_Node m   -> fprintf ppf "!{%a}"
                                  (pp_print_list ~pp_sep:pp_comma_space (metadata env)) m
@@ -582,8 +586,8 @@ and definition : t -> Format.formatter -> Ollvm_ast.definition -> unit =
 and block : t -> Format.formatter -> Ollvm_ast.block -> unit =
   fun env ppf (lbl, b) ->
     begin match lbl with
-      | BAnon i -> fprintf ppf "; <label> %d" i
-      | BName s -> (pp_print_string ppf s; pp_print_char ppf ':')
+      | Anon i -> fprintf ppf "; <label> %d" i
+      | Name s -> (pp_print_string ppf s; pp_print_char ppf ':')
     end;
     pp_force_newline ppf () ;
     pp_print_string ppf "  ";
