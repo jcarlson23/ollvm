@@ -316,6 +316,7 @@ definition:
 df_blocks:
   | bs=pair(terminated(LABEL, EOL+)?, terminated(id_instr, EOL+)+)*
   { let _ = anon_ctr.reset () in
+    let _ = void_ctr.reset () in
     List.map (fun (lbl, instrs) ->
     	     let l = match lbl with
       	     	     | None -> BAnon (anon_ctr.get ())

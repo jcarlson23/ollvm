@@ -448,7 +448,7 @@ and instr_id : t -> Format.formatter -> Ollvm_ast.instr_id -> unit =
     function
     | IAnon n -> fprintf ppf "%%%d = " n
     | IName s -> fprintf ppf "%%%s = " s
-    | IVoid n -> fprintf ppf ""
+    | IVoid n -> fprintf ppf "; void instr %d" n; pp_force_newline ppf ()
   
 
 and tvalue env ppf (t, v) = fprintf ppf "%a %a" typ t (value env) v
