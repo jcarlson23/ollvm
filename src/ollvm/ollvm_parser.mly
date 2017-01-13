@@ -514,43 +514,43 @@ fast_math:
 
 instr:
   | op=ibinop t=typ o1=value COMMA o2=value
-    { INSTR_Op (OP_IBinop (op, t, o1, o2)) }
+    { INSTR_Op (SV (OP_IBinop (op, t, o1, o2))) }
 
   | KW_ICMP op=icmp t=typ o1=value COMMA o2=value
-    { INSTR_Op (OP_ICmp (op, t, o1, o2)) }
+    { INSTR_Op (SV (OP_ICmp (op, t, o1, o2))) }
 
   | op=fbinop f=fast_math* t=typ o1=value COMMA o2=value
-    { INSTR_Op (OP_FBinop (op, f, t, o1, o2)) }
+    { INSTR_Op (SV (OP_FBinop (op, f, t, o1, o2))) }
 
   | KW_FCMP op=fcmp t=typ o1=value COMMA o2=value
-    { INSTR_Op (OP_FCmp (op, t, o1, o2)) }
+    { INSTR_Op (SV (OP_FCmp (op, t, o1, o2))) }
 
   | c=conversion t1=typ v=value KW_TO t2=typ
-    { INSTR_Op (OP_Conversion (c, t1, v, t2)) }
+    { INSTR_Op (SV (OP_Conversion (c, t1, v, t2))) }
 
   | KW_GETELEMENTPTR KW_INBOUNDS? t=typ COMMA ptr=tvalue idx=preceded(COMMA, tvalue)*
-    { INSTR_Op (OP_GetElementPtr (t, ptr, idx)) }
+    { INSTR_Op (SV (OP_GetElementPtr (t, ptr, idx))) }
 
   | KW_SELECT if_=tvalue COMMA then_=tvalue COMMA else_= tvalue
-    { INSTR_Op (OP_Select (if_, then_, else_)) }
+    { INSTR_Op (SV (OP_Select (if_, then_, else_))) }
 
   | KW_EXTRACTELEMENT vec=tvalue COMMA idx=tvalue
-    { INSTR_Op (OP_ExtractElement (vec, idx)) }
+    { INSTR_Op (SV (OP_ExtractElement (vec, idx))) }
 
   | KW_INSERTELEMENT vec=tvalue
     COMMA new_el=tvalue COMMA idx=tvalue
-    { INSTR_Op (OP_InsertElement (vec, new_el, idx))  }
+    { INSTR_Op (SV (OP_InsertElement (vec, new_el, idx)))  }
 
   | KW_EXTRACTVALUE tv=tvalue COMMA
     idx=separated_nonempty_list (csep, INTEGER)
-    { INSTR_Op (OP_ExtractValue (tv, idx)) }
+    { INSTR_Op (SV (OP_ExtractValue (tv, idx))) }
 
   | KW_INSERTVALUE agg=tvalue COMMA new_val=tvalue COMMA
     idx=separated_nonempty_list (csep, INTEGER)
-    { INSTR_Op (OP_InsertValue (agg, new_val, idx)) }
+    { INSTR_Op (SV (OP_InsertValue (agg, new_val, idx))) }
 
   | KW_SHUFFLEVECTOR v1=tvalue COMMA v2=tvalue COMMA mask=tvalue
-    { INSTR_Op (OP_ShuffleVector (v1, v2, mask))  }
+    { INSTR_Op (SV (OP_ShuffleVector (v1, v2, mask)))  }
 
 
   | KW_TAIL? KW_CALL cconv? list(param_attr) f=tident
@@ -629,19 +629,19 @@ csep:
   COMMA EOL* { () }
 
 value:
-  | i=INTEGER                                         { VALUE_Integer i        }
-  | f=FLOAT                                           { VALUE_Float f          }
-  | KW_TRUE                                           { VALUE_Bool true        }
-  | KW_FALSE                                          { VALUE_Bool false       }
-  | KW_NULL                                           { VALUE_Null             }
-  | KW_UNDEF                                          { VALUE_Undef            }
-  | KW_ZEROINITIALIZER                                { VALUE_Zero_initializer }
-  | LCURLY l=separated_list(csep, tconst) RCURLY      { VALUE_Struct l         }
-  | LTLCURLY l=separated_list(csep, tconst) RCURLYGT  { VALUE_Struct l         }
-  | LSQUARE l=separated_list(csep, tconst) RSQUARE    { VALUE_Array l          }
-  | LT l=separated_list(csep, tconst) GT              { VALUE_Vector l         }
-  | i=ident                                           { VALUE_Ident i          }
-  | KW_C cstr=STRING                                  { VALUE_Cstring cstr     }
+  | i=INTEGER                                         { SV (VALUE_Integer i)        }
+  | f=FLOAT                                           { SV (VALUE_Float f)          }
+  | KW_TRUE                                           { SV (VALUE_Bool true)        }
+  | KW_FALSE                                          { SV (VALUE_Bool false)       }
+  | KW_NULL                                           { SV (VALUE_Null)             }
+  | KW_UNDEF                                          { SV (VALUE_Undef)            }
+  | KW_ZEROINITIALIZER                                { SV (VALUE_Zero_initializer) }
+  | LCURLY l=separated_list(csep, tconst) RCURLY      { SV (VALUE_Struct l)         }
+  | LTLCURLY l=separated_list(csep, tconst) RCURLYGT  { SV (VALUE_Struct l)         }
+  | LSQUARE l=separated_list(csep, tconst) RSQUARE    { SV (VALUE_Array l)          }
+  | LT l=separated_list(csep, tconst) GT              { SV (VALUE_Vector l)         }
+  | i=ident                                           { SV (VALUE_Ident i)          }
+  | KW_C cstr=STRING                                  { SV (VALUE_Cstring cstr)     }
 
 lident:
   | l=LOCAL  { l }

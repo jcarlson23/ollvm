@@ -256,8 +256,8 @@ and conversion_type : Format.formatter -> Ollvm_ast.conversion_type -> unit =
                | Bitcast  -> "bitcast")
 
 and value : t -> Format.formatter -> Ollvm_ast.value -> unit =
-  fun env ppf ->
-  function
+  fun env ppf (SV vv) ->
+    match vv with
   | VALUE_Ident i           -> ident env ppf i
   | VALUE_Integer i         -> pp_print_int ppf i
   | VALUE_Float f           -> pp_print_float ppf f
