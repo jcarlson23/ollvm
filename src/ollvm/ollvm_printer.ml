@@ -109,7 +109,7 @@ and fn_attr : Format.formatter -> Ollvm_ast.fn_attr -> unit =
   | FNATTR_Nounwind         -> fprintf ppf "nounwind"
   | FNATTR_Optnone          -> fprintf ppf "optnone"
   | FNATTR_Optsize          -> fprintf ppf "optsize"
-  | FNATTR_Readnone         -> fprintf ppf "readone"
+  | FNATTR_Readnone         -> fprintf ppf "readnone"
   | FNATTR_Readonly         -> fprintf ppf "readonly"
   | FNATTR_Returns_twice    -> fprintf ppf "returns_twice"
   | FNATTR_Sanitize_address -> fprintf ppf "sanitize_address"
@@ -151,18 +151,18 @@ and typ : Format.formatter -> Ollvm_ast.typ -> unit =
   | TYPE_Float            -> fprintf ppf "float"
   | TYPE_Double           -> fprintf ppf "double"
   | TYPE_Label            -> fprintf ppf "label"
-  | TYPE_X86_fp80         -> assert false
-  | TYPE_Fp128            -> assert false
-  | TYPE_Ppc_fp128        -> assert false
+  | TYPE_X86_fp80         -> fprintf ppf "x86_fp80"
+  | TYPE_Fp128            -> fprintf ppf "fp128"
+  | TYPE_Ppc_fp128        -> fprintf ppf "ppc_fp128"
   | TYPE_Metadata         -> fprintf ppf "metadata"
-  | TYPE_X86_mmx          -> assert false
+  | TYPE_X86_mmx          -> fprintf ppf "x86_mmx"
   | TYPE_Array (i, t)     -> fprintf ppf "[%d x %a]" i typ t ;
   | TYPE_Function (t, tl) -> fprintf ppf "%a (%a)" typ t (pp_print_list ~pp_sep:pp_comma_space typ) tl
   | TYPE_Struct tl        -> fprintf ppf "{%a}"
                                      (pp_print_list ~pp_sep:pp_comma_space typ) tl
   | TYPE_Packed_struct tl -> fprintf ppf "<{%a}>"
                                      (pp_print_list ~pp_sep:pp_comma_space typ) tl
-  | TYPE_Opaque           -> assert false
+  | TYPE_Opaque           -> fprintf ppf "opaque"
   | TYPE_Vector (i, t)    -> fprintf ppf "<%d x %a>" i typ t ;
   | TYPE_Identified i     -> ident (empty_env ()) ppf i
 
@@ -279,6 +279,104 @@ and value : t -> Format.formatter -> Ollvm_ast.value -> unit =
   | VALUE_None -> fprintf ppf "none"
   
   | OP_IBinop (op, t, v1, v2) ->
+     fprintf ppf "%a (%a %a, %a %a)"
+             ibinop op
+             typ t
+             (value env) v1
+             typ t
+             (value env) v2
+
+  | OP_ICmp (c, t, v1, v2) ->
+     fprintf ppf "icmp %a (%a %a, %a %a)"
+             icmp c
+             typ t
+             (value env) v1
+             typ t
+             (value env) v2
+
+  | OP_FBinop (op, f, t, v1, v2) ->
+     fbinop ppf op ;
+     if f <> [] then (pp_space ppf () ;
+                      pp_print_list ~pp_sep:pp_space fast_math ppf f) ;
+     fprintf ppf " (%a %a, %a %a)"
+             typ t
+             (value env) v1
+             typ t
+             (value env) v2
+
+  | OP_FCmp (c, t, v1, v2) ->
+     fprintf ppf "fcmp %a (%a %a, %a %a)"
+             fcmp c
+             typ t
+             (value env) v1
+             typ t
+             (value env) v2
+
+  | OP_Conversion (c, t1, v, t2) ->
+     fprintf ppf "%a (%a %a to %a)"
+             conversion_type c
+             typ t1
+             (value env) v
+             typ t2
+
+  | OP_GetElementPtr (t, tv, tvl) ->
+    fprintf ppf "getelementptr (%a, %a, %a)"
+             typ t
+             (tvalue env) tv
+             (pp_print_list ~pp_sep:pp_comma_space (tvalue env)) tvl
+
+  | OP_Select (if_, then_, else_) ->
+     fprintf ppf "select (%a, %a, %a)"
+             (tvalue env) if_
+             (tvalue env) then_
+             (tvalue env) else_
+
+  | OP_ExtractElement (vec, idx) ->
+     fprintf ppf "extractelement (%a, %a)"
+             (tvalue env) vec
+             (tvalue env) idx
+
+  | OP_InsertElement (vec, new_val, idx) ->
+     fprintf ppf "insertelement (%a, %a, %a)"
+             (tvalue env) vec
+             (tvalue env) new_val
+             (tvalue env) idx
+
+  | OP_ExtractValue (agg, idx) ->
+     fprintf ppf "extractvalue (%a, %a)"
+             (tvalue env) agg
+             (pp_print_list ~pp_sep:pp_comma_space pp_print_int) idx
+
+  | OP_InsertValue (agg, new_val, idx) ->
+     fprintf ppf "insertvalue (%a, %a, %a)"
+             (tvalue env) agg
+             (tvalue env) new_val
+             (pp_print_list ~pp_sep:pp_comma_space pp_print_int) idx
+
+  | OP_ShuffleVector (v1, v2, mask) ->
+     fprintf ppf "shufflevector (%a, %a, %a)"
+             (tvalue env) v1
+             (tvalue env) v2
+             (tvalue env) mask
+
+and inst_value : t -> Format.formatter -> Ollvm_ast.value -> unit =
+  fun env ppf (SV vv) ->
+    match vv with
+  | VALUE_Ident _ 
+  | VALUE_Integer _ 
+  | VALUE_Float _   
+  | VALUE_Bool _    
+  | VALUE_Null      
+  | VALUE_Undef     
+  | VALUE_Array _
+  | VALUE_Vector _  
+  | VALUE_Struct _
+  | VALUE_Packed_struct _
+  | VALUE_Zero_initializer 
+  | VALUE_Cstring _ 
+  | VALUE_None -> assert false   (* there should be no "raw" values as instructions *)
+  
+  | OP_IBinop (op, t, v1, v2) ->
      fprintf ppf "%a %a %a, %a"
              ibinop op
              typ t
@@ -360,7 +458,7 @@ and instr : t -> Format.formatter -> Ollvm_ast.instr -> unit =
   fun env ppf ->
   function
 
-  | INSTR_Op v -> value env ppf v
+  | INSTR_Op v -> inst_value env ppf v
 
   | INSTR_Call (ti, tvl) ->
      fprintf ppf "call %a(%a)"
@@ -490,7 +588,6 @@ and metadata : t -> Format.formatter -> Ollvm_ast.metadata -> unit =
                                  (pp_print_list ~pp_sep:pp_comma_space
                                                 (fun ppf i ->
                                                  fprintf ppf "!%s" i)) m
-
 and global : t -> Format.formatter -> Ollvm_ast.global -> unit =
   fun env ppf ->
   fun {
@@ -499,14 +596,17 @@ and global : t -> Format.formatter -> Ollvm_ast.global -> unit =
     g_constant;
     g_value;
 
-    g_linkage = linkage;
+    g_linkage;
     g_visibility = visibility;
     g_dll_storage = gdll;
 
     g_section = s;
     g_align = a;
-  } -> fprintf ppf "%a = %s %a"
-               (ident env) g_ident (if g_constant then "constant" else "global") typ g_typ ;
+  } -> fprintf ppf "%a = "  (ident env) g_ident;
+       (match g_linkage with None -> ()
+                           | Some l -> linkage ppf l; pp_print_string ppf " "
+       );
+       (fprintf ppf "%s %a" (if g_constant then "constant" else "global") typ g_typ) ;
        (match g_value with None -> () | Some v -> (pp_print_string ppf " "; (value env) ppf v)) ;
        (match s with None -> ()
                    | Some s -> fprintf ppf ", section %s" s) ;
@@ -515,73 +615,111 @@ and global : t -> Format.formatter -> Ollvm_ast.global -> unit =
 
 and declaration : t -> Format.formatter -> Ollvm_ast.declaration -> unit =
   fun env ppf ->
-  fun {
-    dc_name = i;
-    dc_type = TYPE_Function (ret_t, args_t);
-    dc_param_attrs = (ret_attrs, args_attrs)
-  } -> let typ_attr =
-         fun ppf (t, attrs) ->
-         typ ppf t ;
-         pp_print_list ~pp_sep:pp_space param_attr ppf attrs in
-       pp_print_string ppf "declare " ;
-       if ret_attrs <> [] then (pp_space ppf () ;
-                                pp_print_list ~pp_sep:pp_space
-                                              param_attr ppf ret_attrs) ;
-       fprintf ppf "%a %a(%a)"
-               typ ret_t
-               (ident env) i
-               (pp_print_list ~pp_sep:pp_comma_space typ_attr)
-               (List.combine args_t args_attrs);
-
+  fun { dc_name = i
+      ; dc_type = TYPE_Function (ret_t, args_t)
+      ; dc_param_attrs = (ret_attrs, args_attrs)
+      ; dc_linkage
+      ; dc_visibility
+      ; dc_dll_storage
+      ; dc_cconv
+      ; dc_attrs
+      ; dc_section
+      ; dc_align
+      ; dc_gc
+      } ->
+    let typ_attr =
+      fun ppf (t, attrs) ->
+        typ ppf t ;
+        pp_print_list ~pp_sep:pp_space param_attr ppf attrs
+    in
+    pp_print_string ppf "declare " ;
+    (match dc_linkage with
+     | Some x -> linkage ppf x ; pp_space ppf ()
+     | _ -> ()) ;
+    (match dc_visibility with
+     | Some x -> visibility ppf x ; pp_space ppf ()
+     | _ -> ()) ;
+    (match dc_dll_storage with
+     | Some x -> dll_storage ppf x ; pp_space ppf ()
+     | _ -> ()) ;
+    (match dc_cconv with
+     | Some x -> cconv ppf x ; pp_space ppf ()
+     | _ -> ()) ;
+    if ret_attrs <> [] then (pp_print_list ~pp_sep:pp_space
+                               param_attr ppf ret_attrs ;
+                             pp_space ppf ()) ;
+    fprintf ppf "%a %a(%a)"
+      typ ret_t
+      (ident env) i
+      (pp_print_list ~pp_sep:pp_comma_space typ_attr)
+      (List.combine args_t args_attrs);
+    (match dc_section with
+       Some x -> fprintf ppf "section \"%s\" " x | _ -> ()) ;
+    (match dc_align with
+       Some x -> fprintf ppf "align %d " x | _ -> ()) ;
+    (match dc_gc with
+       Some x -> fprintf ppf "gc \"%s\" " x | _ -> ()) 
+    
 and definition : t -> Format.formatter -> Ollvm_ast.definition -> unit =
   fun env ppf ->
-  fun ({ df_prototype = { dc_name = i;
-                          dc_type = TYPE_Function (ret_t, args_t);
-                          dc_param_attrs = (ret_attrs, args_attrs) };
+  fun ({ df_prototype =
+           { dc_name = i
+           ; dc_type = TYPE_Function (ret_t, args_t)
+           ; dc_param_attrs = (ret_attrs, args_attrs)
+           ; dc_linkage
+           ; dc_visibility
+           ; dc_dll_storage
+           ; dc_cconv
+           ; dc_attrs
+           ; dc_section
+           ; dc_align
+           ; dc_gc
+           }
        } as df) ->
-  let typ_attr_id =
-    fun ppf ((t, attrs), id) ->
-    typ ppf t ;
-    pp_space ppf () ;
-    if attrs <> [] then (pp_print_list ~pp_sep:pp_space
-                                       param_attr ppf attrs ;
-                         pp_space ppf ()) ;
-    (ident env) ppf id in
-  pp_print_string ppf "define " ;
-  (match df.df_linkage with
-   | Some x -> linkage ppf x ; pp_space ppf ()
-   | _ -> ()) ;
-  (match df.df_visibility with
-   | Some x -> visibility ppf x ; pp_space ppf ()
-   | _ -> ()) ;
-  (match df.df_dll_storage with
-   | Some x -> dll_storage ppf x ; pp_space ppf ()
-   | _ -> ()) ;
-  (match df.df_cconv with
-   | Some x -> cconv ppf x ; pp_space ppf ()
-   | _ -> ()) ;
-  if ret_attrs <> [] then (pp_print_list ~pp_sep:pp_space
-                                         param_attr ppf ret_attrs ;
-                           pp_space ppf ()) ;
-  fprintf ppf "%a %a(%a) "
-            typ ret_t
-            (ident env) i
-            (pp_print_list ~pp_sep:pp_comma_space typ_attr_id)
-            (List.combine (List.combine args_t args_attrs) df.df_args) ;
-            if df.df_attrs <> [] then (pp_print_list ~pp_sep:pp_space
-                                                     fn_attr ppf df.df_attrs ;
-                                       pp_space ppf ()) ;
-  (match df.df_section with
-     Some x -> fprintf ppf "section \"%s\" " x | _ -> ()) ;
-  (match df.df_align with
-     Some x -> fprintf ppf "align %d " x | _ -> ()) ;
-  (match df.df_gc with
-     Some x -> fprintf ppf "gc \"%s\" " x | _ -> ()) ;
-  pp_print_char ppf '{' ;
-  pp_force_newline ppf () ;
-  pp_print_list ~pp_sep:pp_force_newline (block env) ppf df.df_instrs ;
-  pp_force_newline ppf () ;
-  pp_print_char ppf '}' ;
+    let typ_attr_id =
+      fun ppf ((t, attrs), id) ->
+        typ ppf t ;
+        pp_space ppf () ;
+        if attrs <> [] then (pp_print_list ~pp_sep:pp_space
+                               param_attr ppf attrs ;
+                             pp_space ppf ()) ;
+        (ident env) ppf id
+    in
+    pp_print_string ppf "define " ;
+    (match dc_linkage with
+     | Some x -> linkage ppf x ; pp_space ppf ()
+     | _ -> ()) ;
+    (match dc_visibility with
+     | Some x -> visibility ppf x ; pp_space ppf ()
+     | _ -> ()) ;
+    (match dc_dll_storage with
+     | Some x -> dll_storage ppf x ; pp_space ppf ()
+     | _ -> ()) ;
+    (match dc_cconv with
+     | Some x -> cconv ppf x ; pp_space ppf ()
+     | _ -> ()) ;
+    if ret_attrs <> [] then (pp_print_list ~pp_sep:pp_space
+                               param_attr ppf ret_attrs ;
+                             pp_space ppf ()) ;
+    fprintf ppf "%a %a(%a) "
+      typ ret_t
+      (ident env) i
+      (pp_print_list ~pp_sep:pp_comma_space typ_attr_id)
+      (List.combine (List.combine args_t args_attrs) df.df_args) ;
+    if dc_attrs <> [] then (pp_print_list ~pp_sep:pp_space
+                              fn_attr ppf dc_attrs ;
+                            pp_space ppf ()) ;
+    (match dc_section with
+       Some x -> fprintf ppf "section \"%s\" " x | _ -> ()) ;
+    (match dc_align with
+       Some x -> fprintf ppf "align %d " x | _ -> ()) ;
+    (match dc_gc with
+       Some x -> fprintf ppf "gc \"%s\" " x | _ -> ()) ;
+    pp_print_char ppf '{' ;
+    pp_force_newline ppf () ;
+    pp_print_list ~pp_sep:pp_force_newline (block env) ppf df.df_instrs ;
+    pp_force_newline ppf () ;
+    pp_print_char ppf '}' ;
 
 and block : t -> Format.formatter -> Ollvm_ast.block -> unit =
   fun env ppf (lbl, b) ->

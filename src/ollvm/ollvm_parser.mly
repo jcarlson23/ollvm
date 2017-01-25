@@ -257,11 +257,13 @@ global_is_constant:
   | KW_CONSTANT { true }
 
 global_attr:
-  | a=visibility                        { OPT_visibility a           }
-  | a=dll_storage                       { OPT_dll_storage a          }
-  | KW_THREAD_LOCAL LPAREN t=tls RPAREN { OPT_thread_local t         }
-  | KW_UNNAMED_ADDR                     { OPT_unnamed_addr           }
-  | KW_EXTERNALLY_INITIALIZED           { OPT_externally_initialized }
+  | a=visibility                         { OPT_visibility a           }
+  | a=dll_storage                        { OPT_dll_storage a          }
+  | KW_THREAD_LOCAL LPAREN t=tls RPAREN  { OPT_thread_local t         }
+  | KW_UNNAMED_ADDR                      { OPT_unnamed_addr           }
+  | KW_EXTERNALLY_INITIALIZED            { OPT_externally_initialized }
+  | KW_ALIGN n=INTEGER           	 { OPT_align n                }
+  | KW_ADDRSPACE LPAREN n=INTEGER RPAREN { OPT_addrspace n            }
 
 dll_storage:
   | KW_DLLIMPORT { DLLSTORAGE_Dllimport }
@@ -274,14 +276,24 @@ tls:
 
 declaration:
   | KW_DECLARE
-    dc_ret_attrs=param_attr*
-    dc_ret_typ=typ
+    pre_attrs=df_pre_attr*
+    df_ret_attrs=param_attr*
+    df_ret_typ=typ
     name=GLOBAL
     LPAREN dc_args=separated_list(csep, dc_arg) RPAREN
-    post_attrs=global_attr*
-    { {dc_type=TYPE_Function(dc_ret_typ, List.map fst dc_args);
-       dc_name=ID_Global name;
-       dc_param_attrs=(dc_ret_attrs, List.map snd dc_args);} }
+    post_attrs=df_post_attr*
+    { {  dc_type=TYPE_Function(df_ret_typ, List.map fst dc_args);
+         dc_param_attrs=(df_ret_attrs, List.map snd dc_args);
+         dc_name=ID_Global name ;
+         dc_linkage = get_linkage pre_attrs;
+         dc_visibility = get_visibility pre_attrs;
+         dc_dll_storage = get_dll_storage pre_attrs;
+         dc_cconv = get_cconv pre_attrs;
+         dc_attrs = get_fn_attrs post_attrs;
+         dc_section = get_section post_attrs;
+         dc_align = get_align post_attrs;
+         dc_gc = get_gc post_attrs; }
+    }
 
 definition:
   | KW_DEFINE
@@ -299,18 +311,19 @@ definition:
                                    List.map (fun x -> fst (fst x)) df_args) ;
           dc_param_attrs = (df_ret_attrs,
                            List.map (fun x -> snd (fst x)) df_args) ;
-          dc_name=ID_Global name ; } ;
+          dc_name=ID_Global name ;
+	  dc_linkage = get_linkage pre_attrs;
+          dc_visibility = get_visibility pre_attrs;
+          dc_dll_storage = get_dll_storage pre_attrs;
+          dc_cconv = get_cconv pre_attrs;
+          dc_attrs = get_fn_attrs post_attrs;
+          dc_section = get_section post_attrs;
+          dc_align = get_align post_attrs;
+          dc_gc = get_gc post_attrs;
+	  } ;
         df_args=List.map snd df_args;
         df_instrs=df_blocks;
 
-        df_linkage = get_linkage pre_attrs;
-        df_visibility = get_visibility pre_attrs;
-        df_dll_storage = get_dll_storage pre_attrs;
-        df_cconv = get_cconv pre_attrs;
-        df_attrs = get_fn_attrs post_attrs;
-        df_section = get_section post_attrs;
-        df_align = get_align post_attrs;
-        df_gc = get_gc post_attrs;
         } }
 
 df_blocks:
@@ -512,46 +525,106 @@ fbinop:
 fast_math:
   KW_NNAN{Nnan}|KW_NINF{Ninf}|KW_NSZ{Nsz}|KW_ARCP{Arcp}|KW_FAST{Fast}
 
-instr:
+instr_op:
   | op=ibinop t=typ o1=value COMMA o2=value
-    { INSTR_Op (SV (OP_IBinop (op, t, o1, o2))) }
+    { SV (OP_IBinop (op, t, o1, o2)) }
 
   | KW_ICMP op=icmp t=typ o1=value COMMA o2=value
-    { INSTR_Op (SV (OP_ICmp (op, t, o1, o2))) }
+    { SV (OP_ICmp (op, t, o1, o2)) }
 
   | op=fbinop f=fast_math* t=typ o1=value COMMA o2=value
-    { INSTR_Op (SV (OP_FBinop (op, f, t, o1, o2))) }
+    { SV (OP_FBinop (op, f, t, o1, o2)) }
 
   | KW_FCMP op=fcmp t=typ o1=value COMMA o2=value
-    { INSTR_Op (SV (OP_FCmp (op, t, o1, o2))) }
+    { SV (OP_FCmp (op, t, o1, o2)) }
 
   | c=conversion t1=typ v=value KW_TO t2=typ
-    { INSTR_Op (SV (OP_Conversion (c, t1, v, t2))) }
+    { SV (OP_Conversion (c, t1, v, t2)) }
 
   | KW_GETELEMENTPTR KW_INBOUNDS? t=typ COMMA ptr=tvalue idx=preceded(COMMA, tvalue)*
-    { INSTR_Op (SV (OP_GetElementPtr (t, ptr, idx))) }
+    { SV (OP_GetElementPtr (t, ptr, idx)) }
 
   | KW_SELECT if_=tvalue COMMA then_=tvalue COMMA else_= tvalue
-    { INSTR_Op (SV (OP_Select (if_, then_, else_))) }
+    { SV (OP_Select (if_, then_, else_)) }
 
   | KW_EXTRACTELEMENT vec=tvalue COMMA idx=tvalue
-    { INSTR_Op (SV (OP_ExtractElement (vec, idx))) }
+    { SV (OP_ExtractElement (vec, idx)) }
 
   | KW_INSERTELEMENT vec=tvalue
     COMMA new_el=tvalue COMMA idx=tvalue
-    { INSTR_Op (SV (OP_InsertElement (vec, new_el, idx)))  }
+    { SV (OP_InsertElement (vec, new_el, idx))  }
 
   | KW_EXTRACTVALUE tv=tvalue COMMA
     idx=separated_nonempty_list (csep, INTEGER)
-    { INSTR_Op (SV (OP_ExtractValue (tv, idx))) }
+    { SV (OP_ExtractValue (tv, idx)) }
 
   | KW_INSERTVALUE agg=tvalue COMMA new_val=tvalue COMMA
     idx=separated_nonempty_list (csep, INTEGER)
-    { INSTR_Op (SV (OP_InsertValue (agg, new_val, idx))) }
+    { SV (OP_InsertValue (agg, new_val, idx)) }
 
   | KW_SHUFFLEVECTOR v1=tvalue COMMA v2=tvalue COMMA mask=tvalue
-    { INSTR_Op (SV (OP_ShuffleVector (v1, v2, mask)))  }
+    { SV (OP_ShuffleVector (v1, v2, mask))  }
 
+expr_op:
+  | op=ibinop LPAREN t=typ o1=value COMMA typ o2=value RPAREN
+    { SV (OP_IBinop (op, t, o1, o2)) }
+
+  | KW_ICMP op=icmp LPAREN t=typ o1=value COMMA typ o2=value RPAREN
+    { SV (OP_ICmp (op, t, o1, o2)) }
+
+  | op=fbinop f=fast_math* LPAREN t=typ o1=value COMMA typ o2=value RPAREN
+    { SV (OP_FBinop (op, f, t, o1, o2)) }
+
+  | KW_FCMP op=fcmp LPAREN t=typ o1=value COMMA typ o2=value RPAREN
+    { SV (OP_FCmp (op, t, o1, o2)) }
+
+  | c=conversion LPAREN t1=typ v=value KW_TO t2=typ RPAREN
+    { SV (OP_Conversion (c, t1, v, t2)) }
+
+  | KW_GETELEMENTPTR KW_INBOUNDS? LPAREN t=typ COMMA ptr=tvalue idx=preceded(COMMA, tvalue)* RPAREN
+    { SV (OP_GetElementPtr (t, ptr, idx)) }
+
+  | KW_SELECT LPAREN if_=tvalue COMMA then_=tvalue COMMA else_= tvalue RPAREN
+    { SV (OP_Select (if_, then_, else_)) }
+
+  | KW_EXTRACTELEMENT LPAREN vec=tvalue COMMA idx=tvalue RPAREN
+    { SV (OP_ExtractElement (vec, idx)) }
+
+  | KW_INSERTELEMENT LPAREN vec=tvalue COMMA new_el=tvalue COMMA idx=tvalue RPAREN
+    { SV (OP_InsertElement (vec, new_el, idx))  }
+
+  | KW_EXTRACTVALUE LPAREN tv=tvalue COMMA idx=separated_nonempty_list (csep, INTEGER) RPAREN
+    { SV (OP_ExtractValue (tv, idx)) }
+
+  | KW_INSERTVALUE LPAREN agg=tvalue COMMA new_val=tvalue COMMA idx=separated_nonempty_list (csep, INTEGER) RPAREN
+    { SV (OP_InsertValue (agg, new_val, idx)) }
+
+  | KW_SHUFFLEVECTOR LPAREN v1=tvalue COMMA v2=tvalue COMMA mask=tvalue RPAREN
+    { SV (OP_ShuffleVector (v1, v2, mask))  }
+
+
+expr_val:
+  | i=INTEGER                                         { SV (VALUE_Integer i)        }
+  | f=FLOAT                                           { SV (VALUE_Float f)          }
+  | KW_TRUE                                           { SV (VALUE_Bool true)        }
+  | KW_FALSE                                          { SV (VALUE_Bool false)       }
+  | KW_NULL                                           { SV (VALUE_Null)             }
+  | KW_UNDEF                                          { SV (VALUE_Undef)            }
+  | KW_ZEROINITIALIZER                                { SV (VALUE_Zero_initializer) }
+  | LCURLY l=separated_list(csep, tconst) RCURLY      { SV (VALUE_Struct l)         }
+  | LTLCURLY l=separated_list(csep, tconst) RCURLYGT  { SV (VALUE_Struct l)         }
+  | LSQUARE l=separated_list(csep, tconst) RSQUARE    { SV (VALUE_Array l)          }
+  | LT l=separated_list(csep, tconst) GT              { SV (VALUE_Vector l)         }
+  | i=ident                                           { SV (VALUE_Ident i)          }
+  | KW_C cstr=STRING                                  { SV (VALUE_Cstring cstr)     }
+
+value:
+  | eo=expr_op { eo }
+  | ev=expr_val { ev }
+
+
+instr:
+  | eo=instr_op { INSTR_Op eo }
 
   | KW_TAIL? KW_CALL cconv? list(param_attr) f=tident
     a=delimited(LPAREN, separated_list(csep, call_arg), RPAREN)
@@ -627,21 +700,6 @@ switch_table_entry:
 
 csep:
   COMMA EOL* { () }
-
-value:
-  | i=INTEGER                                         { SV (VALUE_Integer i)        }
-  | f=FLOAT                                           { SV (VALUE_Float f)          }
-  | KW_TRUE                                           { SV (VALUE_Bool true)        }
-  | KW_FALSE                                          { SV (VALUE_Bool false)       }
-  | KW_NULL                                           { SV (VALUE_Null)             }
-  | KW_UNDEF                                          { SV (VALUE_Undef)            }
-  | KW_ZEROINITIALIZER                                { SV (VALUE_Zero_initializer) }
-  | LCURLY l=separated_list(csep, tconst) RCURLY      { SV (VALUE_Struct l)         }
-  | LTLCURLY l=separated_list(csep, tconst) RCURLYGT  { SV (VALUE_Struct l)         }
-  | LSQUARE l=separated_list(csep, tconst) RSQUARE    { SV (VALUE_Array l)          }
-  | LT l=separated_list(csep, tconst) GT              { SV (VALUE_Vector l)         }
-  | i=ident                                           { SV (VALUE_Ident i)          }
-  | KW_C cstr=STRING                                  { SV (VALUE_Cstring cstr)     }
 
 lident:
   | l=LOCAL  { l }

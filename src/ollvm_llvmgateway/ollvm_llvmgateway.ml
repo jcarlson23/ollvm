@@ -232,23 +232,23 @@ let rec value : env -> Ollvm.Ast.typ -> Ollvm.Ast.value -> Llvm.llvalue =
   fun env ty ->
   let open Llvm
   in function
-  | VALUE_Ident i          -> lookup env i
-  | VALUE_Integer i        -> const_int (typ env ty) i
-  | VALUE_Float f          -> const_float (typ env ty) f
-  | VALUE_Bool b           -> const_int (Llvm.i1_type env.c) (if b then 1 else 0)
-  | VALUE_Null             -> const_null (typ env ty)
-  | VALUE_Undef            -> undef (typ env ty)
-  | VALUE_Struct s         ->
+  | SV (VALUE_Ident i)     -> lookup env i
+  | SV (VALUE_Integer i)        -> const_int (typ env ty) i
+  | SV (VALUE_Float f)          -> const_float (typ env ty) f
+  | SV (VALUE_Bool b)           -> const_int (Llvm.i1_type env.c) (if b then 1 else 0)
+  | SV (VALUE_Null)             -> const_null (typ env ty)
+  | SV VALUE_Undef            -> undef (typ env ty)
+  | SV (VALUE_Struct s)         ->
      const_struct env.c (Array.of_list s |> Array.map (fun (ty, v) -> value env ty v))
-  | VALUE_Packed_struct s  ->
+  | SV (VALUE_Packed_struct s)  ->
      const_packed_struct env.c (Array.of_list s
                                 |> Array.map (fun (ty, v) -> value env ty v))
-  | VALUE_Array a          ->
+  | SV (VALUE_Array a)          ->
      const_array  (typ env ty) (Array.of_list a
                                 |> Array.map (fun (ty, v) -> value env ty v))
-  | VALUE_Vector v         ->
+  | SV (VALUE_Vector v)         ->
      const_vector (Array.of_list v |> Array.map (fun (ty, v) -> value env ty v))
-  | VALUE_Zero_initializer -> assert false
+  | SV (VALUE_Zero_initializer) -> assert false
 
 let rec instr : env -> Ollvm.Ast.instr -> (env * Llvm.llvalue) =
   fun env ->

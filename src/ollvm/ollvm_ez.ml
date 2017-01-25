@@ -186,7 +186,16 @@ module Block = struct
     let open Ollvm_ast in
     { dc_type = TYPE_Function (t, args_typ);
       dc_name = id;
-      dc_param_attrs = ([], List.map (fun _ -> []) args_typ) }
+      dc_param_attrs = ([], List.map (fun _ -> []) args_typ);
+      dc_linkage =  None;
+      dc_visibility = None;
+      dc_dll_storage = None;
+      dc_cconv = None;
+      dc_attrs = [];
+      dc_section = None;
+      dc_align = None;
+      dc_gc = None;
+    }
 
   let define fn args (instrs : block list) =
     let args = List.map Value.ident args in
@@ -203,14 +212,6 @@ module Block = struct
     { df_prototype = proto;
       df_args = List.map snd args;
       df_instrs = blocks;
-      df_linkage =  None;
-      df_visibility = None;
-      df_dll_storage = None;
-      df_cconv = None;
-      df_attrs = [];
-      df_section = None;
-      df_align = None;
-      df_gc = None;
     }
 
   let block  id instrs =
