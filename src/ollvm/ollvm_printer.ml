@@ -499,7 +499,7 @@ and instr : t -> Format.formatter -> Ollvm_ast.instr -> unit =
   | INSTR_Store (vol, v, ptr, a) ->
      pp_print_string ppf "store " ;
      if vol then pp_print_string ppf "volatile " ;
-     fprintf ppf "%a, %a" (tvalue env) v (tident env) ptr ;
+     fprintf ppf "%a, %a" (tvalue env) v (tvalue env) ptr ;
      (match a with None -> ()
                  | Some a -> fprintf ppf ", align %d" a)
 

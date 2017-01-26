@@ -72,7 +72,7 @@ module Instr = struct
     (t, Ollvm_ast.INSTR_Load (volatile, t, (ptr_t, value), align))
 
   let store ?(volatile=false)? (align=None) value pointer =
-    (Type.void, Ollvm_ast.INSTR_Store (volatile, value, ident pointer, align))
+    (Type.void, Ollvm_ast.INSTR_Store (volatile, value, pointer, align))
 
   let icmp cmp (t, op1) (_, op2) =
     (Type.i1, Ollvm_ast.INSTR_Op (Ollvm_ast.SV (Ollvm_ast.OP_ICmp (cmp, t, op1, op2))))

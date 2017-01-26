@@ -612,7 +612,7 @@ expr_val:
   | KW_UNDEF                                          { SV (VALUE_Undef)            }
   | KW_ZEROINITIALIZER                                { SV (VALUE_Zero_initializer) }
   | LCURLY l=separated_list(csep, tconst) RCURLY      { SV (VALUE_Struct l)         }
-  | LTLCURLY l=separated_list(csep, tconst) RCURLYGT  { SV (VALUE_Struct l)         }
+  | LTLCURLY l=separated_list(csep, tconst) RCURLYGT  { SV (VALUE_Packed_struct l)  }
   | LSQUARE l=separated_list(csep, tconst) RSQUARE    { SV (VALUE_Array l)          }
   | LT l=separated_list(csep, tconst) GT              { SV (VALUE_Vector l)         }
   | i=ident                                           { SV (VALUE_Ident i)          }
@@ -645,8 +645,7 @@ instr:
   | KW_VAARG  { failwith"INSTR_VAArg"  }
   | KW_LANDINGPAD    { failwith"INSTR_LandingPad"    }
 
-  | KW_STORE vol=KW_VOLATILE? all=tvalue COMMA ptr=tident
-    a=preceded(COMMA, align)?
+  | KW_STORE vol=KW_VOLATILE? all=tvalue COMMA ptr=tvalue a=preceded(COMMA, align)?
     { INSTR_Store (vol<>None, all, ptr, a) }
 
   | KW_ATOMICCMPXCHG { failwith"INSTR_AtomicCmpXchg" }
