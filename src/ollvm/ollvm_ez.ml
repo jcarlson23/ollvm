@@ -151,21 +151,21 @@ module Instr = struct
     (fst agg, Ollvm_ast.INSTR_Op(Ollvm_ast.SV (Ollvm_ast.OP_InsertValue (agg, el, idx))))
 
   let br cond (t, Ollvm_ast.SV (Ollvm_ast.VALUE_Ident then_)) (t', Ollvm_ast.SV (Ollvm_ast.VALUE_Ident else_)) =
-    Ollvm_ast.INSTR_Br (cond, (t, then_), (t', else_))
+    Ollvm_ast.TERM_Br (cond, (t, then_), (t', else_))
 
   let br1 (t, Ollvm_ast.SV (Ollvm_ast.VALUE_Ident branch)) =
-    Ollvm_ast.INSTR_Br_1 (t, branch)
+    Ollvm_ast.TERM_Br_1 (t, branch)
 
   let switch sw default cases =
     let cases = List.map (fun (v, i) -> (v, ident i)) cases in
-    Ollvm_ast.INSTR_Switch (sw, ident default, cases)
+    Ollvm_ast.TERM_Switch (sw, ident default, cases)
 
   let indirectbr tv til =
-    Ollvm_ast.INSTR_IndirectBr (tv, List.map ident til)
+    Ollvm_ast.TERM_IndirectBr (tv, List.map ident til)
 
-  let ret x = Ollvm_ast.INSTR_Ret x
+  let ret x = Ollvm_ast.TERM_Ret x
 
-  let ret_void = Ollvm_ast.INSTR_Ret_void
+  let ret_void = Ollvm_ast.TERM_Ret_void
 
   (* let assign id (_, expr) = *)
   (*   let (_, id) = ident id in *)
@@ -204,7 +204,7 @@ module Block = struct
       | Ollvm_ast.ID_Local (Name s) -> Name s
       | _ -> assert false in
 
-    let blocks = List.map (fun (id, instrs) -> (extract_name id, instrs)) instrs
+    let blocks = []
 
     in
     let proto = declare fn (List.map fst args) in

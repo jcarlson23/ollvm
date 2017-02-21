@@ -506,17 +506,24 @@ and instr : t -> Format.formatter -> Ollvm_ast.instr -> unit =
   | INSTR_AtomicCmpXchg
   | INSTR_AtomicRMW
   | INSTR_Fence -> assert false
+  | INSTR_Unreachable -> pp_print_string ppf "unreachable"
 
-  | INSTR_Ret (t, v)       -> fprintf ppf "ret %a" (tvalue env) (t, v)
 
-  | INSTR_Ret_void         -> pp_print_string ppf "ret void"
 
-  | INSTR_Br (c, i1, i2)   ->
+and terminator : t -> Format.formatter -> Ollvm_ast.terminator -> unit =
+  fun env ppf ->
+  function
+
+  | TERM_Ret (t, v)       -> fprintf ppf "ret %a" (tvalue env) (t, v)
+
+  | TERM_Ret_void         -> pp_print_string ppf "ret void"
+
+  | TERM_Br (c, i1, i2)   ->
      fprintf ppf "br %a, %a, %a" (tvalue env) c (tident env) i1 (tident env) i2
 
-  | INSTR_Br_1 (t, i)       -> fprintf ppf "br %a %a" typ t (ident env) i
+  | TERM_Br_1 (t, i)       -> fprintf ppf "br %a %a" typ t (ident env) i
 
-  | INSTR_Switch (c, def, cases) ->
+  | TERM_Switch (c, def, cases) ->
      fprintf ppf "switch %a, %a [%a]"
              (tvalue env) c
              (tident env) def
@@ -525,16 +532,14 @@ and instr : t -> Format.formatter -> Ollvm_ast.instr -> unit =
                                                pp_print_string ppf ", " ;
                                                tident env ppf i)) cases
 
-  | INSTR_Resume (t, v) -> fprintf ppf "resume %a" (tvalue env) (t, v)
+  | TERM_Resume (t, v) -> fprintf ppf "resume %a" (tvalue env) (t, v)
 
-  | INSTR_Unreachable -> pp_print_string ppf "unreachable"
-
-  | INSTR_IndirectBr (tv, til) ->
+  | TERM_IndirectBr (tv, til) ->
     fprintf ppf "indirectbr %a, [%a]"
       (tvalue env) tv
       (pp_print_list ~pp_sep:pp_comma_space (tident env)) til
 
-  | INSTR_Invoke (ti, tvl, i2, i3) ->
+  | TERM_Invoke (ti, tvl, i2, i3) ->
      fprintf ppf "invoke %a(%a) to %a unwind %a"
              (tident env) ti
              (pp_print_list ~pp_sep:pp_comma_space (tvalue env)) tvl
@@ -722,7 +727,7 @@ and definition : t -> Format.formatter -> Ollvm_ast.definition -> unit =
     pp_print_char ppf '}' ;
 
 and block : t -> Format.formatter -> Ollvm_ast.block -> unit =
-  fun env ppf (lbl, b) ->
+  fun env ppf {block_lbl=lbl; block_insns=b; block_terminator=t} ->
     begin match lbl with
       | Anon i -> fprintf ppf "; <label> %d" i
       | Name s -> (pp_print_string ppf s; pp_print_char ppf ':')
@@ -731,6 +736,8 @@ and block : t -> Format.formatter -> Ollvm_ast.block -> unit =
     pp_print_string ppf "  ";
     pp_open_box ppf 0 ;
     pp_print_list ~pp_sep:pp_force_newline (id_instr env) ppf b ;
+    pp_force_newline ppf () ;
+    terminator env ppf t;
     pp_close_box ppf ()
 
 and modul : t -> Format.formatter -> Ollvm_ast.modul -> unit =

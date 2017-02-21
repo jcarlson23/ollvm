@@ -432,18 +432,18 @@ let declaration : env -> Ollvm.Ast.declaration -> env * Llvm.llvalue =
 
 let create_block : env -> Ollvm.Ast.block -> Llvm.llvalue -> env =
   fun env b fn ->
-  if List.mem_assoc (fst b) env.labels then assert false ;
-  let bname = match (fst b) with Anon _ -> "" | Name s -> s in
+  if List.mem_assoc (b.block_lbl) env.labels then assert false ;
+  let bname = match (b.block_lbl) with Anon _ -> "" | Name s -> s in
   let llb = Llvm.append_block env.c bname fn in
-  { env with labels = (fst b, llb) :: env.labels }
+  { env with labels = (b.block_lbl, llb) :: env.labels }
 
 
 let block : env -> Ollvm.Ast.block -> env =
   fun env block ->
-  let bb = List.assoc (fst block) env.labels in
+  let bb = List.assoc (block.block_lbl) env.labels in
   Llvm.position_at_end bb env.b;
   (* process instructions *)
-  let env = List.fold_left (fun env i -> instr env (snd i) |> fst) env (snd block) in
+  let env = List.fold_left (fun env i -> instr env (snd i) |> fst) env (block.block_insns) in
   env
 
 let definition : env -> Ollvm.Ast.definition -> env =

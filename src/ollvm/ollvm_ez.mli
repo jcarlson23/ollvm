@@ -163,26 +163,26 @@ module Instr : sig
 
   (** [br cond lbl_true lbl_false] jumps to [lbl_true] or [lbl_false]
       depending on the value of [cond]. *)
-  val br : Value.t -> Value.t -> Value.t -> Ollvm_ast.instr
+  val br : Value.t -> Value.t -> Value.t -> Ollvm_ast.terminator
 
  (** [br1 label] jumps to [label]. *)
-  val br1 : Value.t -> Ollvm_ast.instr
+  val br1 : Value.t -> Ollvm_ast.terminator
 
   (** [switch cond default [(int1, labelN); ... ; (intN, labelN)]]
       jumps to the [labelX] whose associted [intX] is equal to [cond].
       If no such integer is found, then jumps to [default] label. *)
-  val switch : Value.t -> Value.t -> (Value.t * Value.t) list -> Ollvm_ast.instr
+  val switch : Value.t -> Value.t -> (Value.t * Value.t) list -> Ollvm_ast.terminator
 
   (** [indirectbr addr possibles] returns the corresponding indirectbr
       instruction. [addr] is the address where to jump, [possibles] is
       the full set of values that can take [addr]. *)
-  val indirectbr : Value.t -> Value.t list -> Ollvm_ast.instr
+  val indirectbr : Value.t -> Value.t list -> Ollvm_ast.terminator
 
   (** [ret val] returns [val]. *)
-  val ret : Value.t -> Ollvm_ast.instr
+  val ret : Value.t -> Ollvm_ast.terminator
 
   (** [ret_void] returns with no value. *)
-  val ret_void : Ollvm_ast.instr
+  val ret_void : Ollvm_ast.terminator
 
   (* (\** Binds a [t] to an identifier. *)
   (*     i. e. build a [ollvm] assignment instruction. *\) *)

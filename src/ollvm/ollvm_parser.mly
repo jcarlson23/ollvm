@@ -101,14 +101,6 @@ let void_ctr = mk_counter ()
   
 let id_of = function
   | INSTR_Store _
-  | INSTR_Invoke _
-  | INSTR_Ret _
-  | INSTR_Ret_void
-  | INSTR_Br _
-  | INSTR_Br_1 _
-  | INSTR_Switch _
-  | INSTR_IndirectBr _
-  | INSTR_Resume _
   | INSTR_Unreachable
   | INSTR_Fence
   | INSTR_Call ((TYPE_Void, _), _)
@@ -327,10 +319,10 @@ definition:
         } }
 
 df_blocks:
-  | bs=pair(terminated(LABEL, EOL+)?, terminated(id_instr, EOL+)+)*
+  | bs=pair(terminated(LABEL, EOL+)?, pair(terminated(id_instr, EOL+)+, terminated(terminator, EOL+)))*
   { let _ = anon_ctr.reset () in
     let _ = void_ctr.reset () in
-    List.map (fun (lbl, instrs) ->
+    List.map (fun (lbl, (instrs, term)) ->
     	     let l = match lbl with
       	     	     | None -> Anon (anon_ctr.get ())
                      | Some s -> Name s
@@ -339,7 +331,7 @@ df_blocks:
                                    | None -> (id_of inst, inst)
                                    | Some s -> (IId s, inst)
               ) instrs in
-	      (l, iis))
+	      {block_lbl=l; block_insns=iis; block_terminator=term})
         bs }		     
 (*
   | hd_lbl=terminated(LABEL, EOL+)? hd=terminated(instr, EOL+)+
@@ -652,36 +644,38 @@ instr:
   | KW_ATOMICRMW     { failwith"INSTR_AtomicRMW"     }
   | KW_FENCE         { failwith"INSTR_Fence"         }
 
+  | KW_UNREACHABLE
+    { INSTR_Unreachable }
+
+  
+terminator:  
   | KW_RET t=typ o=value
-    { INSTR_Ret (t, o) }
+    { TERM_Ret (t, o) }
 
   | KW_RET KW_VOID
-    { INSTR_Ret_void }
+    { TERM_Ret_void }
 
   | KW_BR c=tvalue COMMA o1=tident COMMA o2=tident
-    { INSTR_Br (c, o1, o2) }
+    { TERM_Br (c, o1, o2) }
 
   | KW_BR b=tident
-    { INSTR_Br_1 b }
+    { TERM_Br_1 b }
 
   | KW_SWITCH c=tvalue COMMA
     def=tident LSQUARE EOL? table=list(switch_table_entry) RSQUARE
-    { INSTR_Switch (c, def, table) }
+    { TERM_Switch (c, def, table) }
 
   | KW_INDIRECTBR tv=tvalue
     COMMA LSQUARE til=separated_list(csep, tident)  RSQUARE
-    { INSTR_IndirectBr (tv, til) }
+    { TERM_IndirectBr (tv, til) }
 
   | KW_RESUME tv=tvalue
-    { INSTR_Resume tv }
-
-  | KW_UNREACHABLE
-    { INSTR_Unreachable }
+    { TERM_Resume tv }
 
   | KW_INVOKE cconv? ret=tident
     LPAREN a=separated_list(csep, call_arg) RPAREN
     list(fn_attr) KW_TO l1=tident KW_UNWIND l2=tident
-    { INSTR_Invoke (ret, a, l1, l2)  }
+    { TERM_Invoke (ret, a, l1, l2)  }
 
 id_instr:
   | id=lident EQ inst=instr { (Some id, inst) }
