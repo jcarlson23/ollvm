@@ -140,7 +140,6 @@ and ident : t -> Format.formatter -> Ollvm_ast.ident -> unit =
   | ID_Global i -> pp_print_char ppf '@' ; pp_print_string ppf (str_of_raw_id i)
   | ID_Local i  -> pp_print_char ppf '%' ; pp_print_string ppf (str_of_raw_id i)
 
-
 and typ : Format.formatter -> Ollvm_ast.typ -> unit =
   fun ppf ->
   function
@@ -607,7 +606,7 @@ and global : t -> Format.formatter -> Ollvm_ast.global -> unit =
 
     g_section = s;
     g_align = a;
-  } -> fprintf ppf "%a = "  (ident env) g_ident;
+  } -> fprintf ppf "@%s = "  (str_of_raw_id g_ident);
        (match g_linkage with None -> ()
                            | Some l -> linkage ppf l; pp_print_string ppf " "
        );
@@ -653,9 +652,9 @@ and declaration : t -> Format.formatter -> Ollvm_ast.declaration -> unit =
     if ret_attrs <> [] then (pp_print_list ~pp_sep:pp_space
                                param_attr ppf ret_attrs ;
                              pp_space ppf ()) ;
-    fprintf ppf "%a %a(%a)"
+    fprintf ppf "%a %%%s(%a)"
       typ ret_t
-      (ident env) i
+      (str_of_raw_id i)
       (pp_print_list ~pp_sep:pp_comma_space typ_attr)
       (List.combine args_t args_attrs);
     (match dc_section with
@@ -706,9 +705,9 @@ and definition : t -> Format.formatter -> Ollvm_ast.definition -> unit =
     if ret_attrs <> [] then (pp_print_list ~pp_sep:pp_space
                                param_attr ppf ret_attrs ;
                              pp_space ppf ()) ;
-    fprintf ppf "%a %a(%a) "
+    fprintf ppf "%a %%%s(%a) "
       typ ret_t
-      (ident env) i
+      (str_of_raw_id i)
       (pp_print_list ~pp_sep:pp_comma_space typ_attr_id)
       (List.combine (List.combine args_t args_attrs) df.df_args) ;
     if dc_attrs <> [] then (pp_print_list ~pp_sep:pp_space
@@ -727,7 +726,7 @@ and definition : t -> Format.formatter -> Ollvm_ast.definition -> unit =
     pp_print_char ppf '}' ;
 
 and block : t -> Format.formatter -> Ollvm_ast.block -> unit =
-  fun env ppf {block_lbl=lbl; block_insns=b; block_terminator=t} ->
+  fun env ppf {blk_id=lbl; blk_instrs=b; blk_term=t} ->
     begin match lbl with
       | Anon i -> fprintf ppf "; <label> %d" i
       | Name s -> (pp_print_string ppf s; pp_print_char ppf ':')

@@ -206,7 +206,7 @@ global_decl:
     g_typ=typ
     opt=preceded(COMMA, separated_list(csep, global_attr))?
       { let opt = match opt with Some o -> o | None -> [] in
-        { g_ident=ID_Global ident;
+        { g_ident=ident;
           g_typ;
           g_constant;
 
@@ -229,7 +229,7 @@ global_decl:
     gv=value
     opt=preceded(COMMA, separated_list(csep, global_attr))?
       { let opt = match opt with Some o -> o | None -> [] in
-        { g_ident=ID_Global ident;
+        { g_ident=ident;
           g_typ;
           g_constant;
           g_value = Some gv;
@@ -276,7 +276,7 @@ declaration:
     post_attrs=df_post_attr*
     { {  dc_type=TYPE_Function(df_ret_typ, List.map fst dc_args);
          dc_param_attrs=(df_ret_attrs, List.map snd dc_args);
-         dc_name=ID_Global name ;
+         dc_name = name ;
          dc_linkage = get_linkage pre_attrs;
          dc_visibility = get_visibility pre_attrs;
          dc_dll_storage = get_dll_storage pre_attrs;
@@ -303,7 +303,7 @@ definition:
                                    List.map (fun x -> fst (fst x)) df_args) ;
           dc_param_attrs = (df_ret_attrs,
                            List.map (fun x -> snd (fst x)) df_args) ;
-          dc_name=ID_Global name ;
+          dc_name=name ;
 	  dc_linkage = get_linkage pre_attrs;
           dc_visibility = get_visibility pre_attrs;
           dc_dll_storage = get_dll_storage pre_attrs;
@@ -331,7 +331,7 @@ df_blocks:
                                    | None -> (id_of inst, inst)
                                    | Some s -> (IId s, inst)
               ) instrs in
-	      {block_lbl=l; block_insns=iis; block_terminator=term})
+	      {blk_id=l; blk_instrs=iis; blk_term=term; blk_term_id=IVoid (void_ctr.get ())})
         bs }		     
 (*
   | hd_lbl=terminated(LABEL, EOL+)? hd=terminated(instr, EOL+)+

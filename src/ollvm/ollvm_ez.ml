@@ -182,8 +182,8 @@ module Block = struct
   type block = Ollvm_ast.ident * ((Ollvm_ast.instr_id * Ollvm_ast.instr) list)
 
   let declare fn args_typ =
-    let (t, id) = Value.ident fn in
     let open Ollvm_ast in
+    let (t, ID_Local id) = Value.ident fn in
     { dc_type = TYPE_Function (t, args_typ);
       dc_name = id;
       dc_param_attrs = ([], List.map (fun _ -> []) args_typ);
@@ -309,14 +309,14 @@ module Module = struct
     List.assoc name m.m_module.m_definitions
 
   let declaration m dc =
-    let Ollvm_ast.ID_Global (Name name) = dc.Ollvm_ast.dc_name in
+    let Ollvm_ast.Name name = dc.Ollvm_ast.dc_name in
     { m with m_module = { m.m_module with
                           m_declarations = (name, dc)
                                            :: m.m_module.m_declarations } }
 
   let definition m df =
     let { Ollvm_ast.df_prototype = dc; _; } = df in
-    let Ollvm_ast.ID_Global (Name name) = dc.dc_name in
+    let Ollvm_ast.Name name = dc.dc_name in
     { m with m_module = { m.m_module with
                           m_declarations = (name, dc)
                                            :: m.m_module.m_declarations ;

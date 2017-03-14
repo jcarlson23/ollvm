@@ -6,7 +6,7 @@ type env = { c: Llvm.llcontext;
 
              (* llvalue/llbasicblock binded to Ollvm.Ast.ident*)
              mem: (Ollvm.Ast.ident * Llvm.llvalue) list;
-             labels: (Ollvm.Ast.block_label * Llvm.llbasicblock) list }
+             labels: (Ollvm.Ast.block_id * Llvm.llbasicblock) list }
 
 let lookup env id = List.assoc id env.mem
 
@@ -24,12 +24,12 @@ let string_of_ident : Ollvm.Ast.ident -> string = function
   | ID_Local i -> string_of_raw_id i
   | ID_Global i -> string_of_raw_id i
 
-let block_label_of_ident : Ollvm.Ast.ident -> Ollvm.Ast.block_label = function
+let block_id_of_ident : Ollvm.Ast.ident -> Ollvm.Ast.block_id = function
   | ID_Local i -> i
   | ID_Global i -> assert false
 
 let label : env -> Ollvm.Ast.ident -> Llvm.llbasicblock =
-  fun env id -> List.assoc (block_label_of_ident id) env.labels
+  fun env id -> List.assoc (block_id_of_ident id) env.labels
 
 let linkage : Ollvm.Ast.linkage -> Llvm.Linkage.t =
   let open Llvm.Linkage
@@ -418,13 +418,13 @@ let global : env -> Ollvm.Ast.global -> env =
   fun env g ->
   let llv = value env g.g_typ (match g.g_value with Some x -> x
                                                   | None -> assert false) in
-  let Ollvm.Ast.ID_Global (Name name) = g.g_ident in
+  let Ollvm.Ast.Name name = g.g_ident in
   let llv = Llvm.define_global name llv env.m in
-  {env with mem = (g.g_ident, llv) :: env.mem }
+  {env with mem = (Ollvm.Ast.ID_Global g.g_ident, llv) :: env.mem }
 
 let declaration : env -> Ollvm.Ast.declaration -> env * Llvm.llvalue =
   fun env dc ->
-  let name = (string_of_ident dc.dc_name) in
+  let name = (string_of_raw_id dc.dc_name) in
   let fn =  match Llvm.lookup_function name env.m with
     | None -> Llvm.declare_function name (typ env dc.dc_type) env.m ;
     | Some fn -> fn in
@@ -432,18 +432,18 @@ let declaration : env -> Ollvm.Ast.declaration -> env * Llvm.llvalue =
 
 let create_block : env -> Ollvm.Ast.block -> Llvm.llvalue -> env =
   fun env b fn ->
-  if List.mem_assoc (b.block_lbl) env.labels then assert false ;
-  let bname = match (b.block_lbl) with Anon _ -> "" | Name s -> s in
+  if List.mem_assoc (b.blk_id) env.labels then assert false ;
+  let bname = match (b.blk_id) with Anon _ -> "" | Name s -> s in
   let llb = Llvm.append_block env.c bname fn in
-  { env with labels = (b.block_lbl, llb) :: env.labels }
+  { env with labels = (b.blk_id, llb) :: env.labels }
 
 
 let block : env -> Ollvm.Ast.block -> env =
   fun env block ->
-  let bb = List.assoc (block.block_lbl) env.labels in
+  let bb = List.assoc (block.blk_id) env.labels in
   Llvm.position_at_end bb env.b;
   (* process instructions *)
-  let env = List.fold_left (fun env i -> instr env (snd i) |> fst) env (block.block_insns) in
+  let env = List.fold_left (fun env i -> instr env (snd i) |> fst) env (block.blk_instrs) in
   env
 
 let definition : env -> Ollvm.Ast.definition -> env =
@@ -453,7 +453,7 @@ let definition : env -> Ollvm.Ast.definition -> env =
   if Array.length (Llvm.basic_blocks fn) <> 0
   then assert false;
   let env =
-    lookup_fn env df.df_prototype.dc_name
+    lookup_fn env (Ollvm.Ast.ID_Local df.df_prototype.dc_name)
     |> Llvm.params
     |> Array.mapi (fun i a -> (List.nth df.df_args i, a ))
     |> Array.fold_left (fun env (i, a) ->

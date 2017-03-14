@@ -9,7 +9,7 @@ type env = { c: Llvm.llcontext;
              (** [llvalues] binded to [ident] (local variables) *)
              mem: (Ollvm.Ast.ident * Llvm.llvalue) list;
              (** [llbasicblocks] binded to [string] (local labels) *)
-             labels: (Ollvm.Ast.block_label * Llvm.llbasicblock) list }
+             labels: (Ollvm.Ast.block_id * Llvm.llbasicblock) list }
 
 val linkage : Ollvm.Ast.linkage -> Llvm.Linkage.t
 

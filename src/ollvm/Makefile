@@ -7,10 +7,12 @@ SOURCES = \
 	$(LIBNAME)_parser.mly \
 	$(LIBNAME)_lexer.mll \
 	$(LIBNAME)_printer.ml \
+	$(LIBNAME)_ez.ml \
 	$(LIBNAME).ml
 
 CMI = \
 	$(LIBNAME).cmi \
+	$(LIBNAME)_ez.cmi \
 	$(LIBNAME)_printer.cmi \
 	$(LIBNAME)_lexer.cmi
 
