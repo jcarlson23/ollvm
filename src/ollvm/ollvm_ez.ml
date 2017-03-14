@@ -42,7 +42,9 @@ module Value = struct
     (Type.structure (List.map fst l),
      Ollvm_ast.SV (Ollvm_ast.VALUE_Struct l))
 
-  let ident (t, Ollvm_ast.SV (Ollvm_ast.VALUE_Ident id)) = (t, id)
+  let ident = function
+    | (t, Ollvm_ast.SV (Ollvm_ast.VALUE_Ident id)) -> (t, id)
+    | _ -> assert false
 
 end
 
@@ -58,7 +60,7 @@ module Instr = struct
   let phi value_label =
     let t = List.hd value_label |> fst |> fst in
     let value_label =
-      List.map (fun (v, i) -> (snd v, snd (ident i))) value_label in
+      List.map (fun (i, v) -> (snd (ident i), snd v)) value_label in
     (t, Ollvm_ast.INSTR_Phi (t, value_label))
 
   let select tcond (t, v1) tv2 =
@@ -67,8 +69,12 @@ module Instr = struct
   let alloca ?(nb=None) ?(align=None) t =
     (Type.pointer t, Ollvm_ast.INSTR_Alloca (t, nb, align))
 
+  let get_ptr_t = function
+    | Ollvm_ast.TYPE_Pointer t -> t
+    | _ -> assert false
+  
   let load ?(volatile=false) ?(align=None) (ptr_t, value) =
-    let Ollvm_ast.TYPE_Pointer t = ptr_t in
+    let t  = get_ptr_t ptr_t in
     (t, Ollvm_ast.INSTR_Load (volatile, t, (ptr_t, value), align))
 
   let store ?(volatile=false)? (align=None) value pointer =
@@ -121,8 +127,12 @@ module Instr = struct
   let fdiv = fbinop Ollvm_ast.FDiv
   let frem = fbinop Ollvm_ast.FRem
 
+  let get_vector_t = function
+    | (Ollvm_ast.TYPE_Vector (_, t), _) -> t
+    | _ -> assert false
+  
   let extractelement vec idx =
-    let (Ollvm_ast.TYPE_Vector (n, t), _) = vec in
+    let t = get_vector_t vec in
     (t, Ollvm_ast.INSTR_Op(Ollvm_ast.SV (Ollvm_ast.OP_ExtractElement (vec, idx))))
 
   let insertelement vec el idx =
@@ -150,10 +160,17 @@ module Instr = struct
   let insertvalue agg el idx =
     (fst agg, Ollvm_ast.INSTR_Op(Ollvm_ast.SV (Ollvm_ast.OP_InsertValue (agg, el, idx))))
 
-  let br cond (t, Ollvm_ast.SV (Ollvm_ast.VALUE_Ident then_)) (t', Ollvm_ast.SV (Ollvm_ast.VALUE_Ident else_)) =
+  let get_value_ident = function
+    | Ollvm_ast.SV (Ollvm_ast.VALUE_Ident x) -> x
+    | _ -> assert false
+  
+  let br cond (t, v1) (t', v2) =
+    let then_ = get_value_ident v1 in
+    let else_ = get_value_ident v2 in
     Ollvm_ast.TERM_Br (cond, (t, then_), (t', else_))
 
-  let br1 (t, Ollvm_ast.SV (Ollvm_ast.VALUE_Ident branch)) =
+  let br1 (t, v) =
+    let branch = get_value_ident v in
     Ollvm_ast.TERM_Br_1 (t, branch)
 
   let switch sw default cases =
@@ -181,9 +198,13 @@ module Block = struct
 
   type block = Ollvm_ast.ident * ((Ollvm_ast.instr_id * Ollvm_ast.instr) list)
 
+  let get_local = function
+    | (t, Ollvm_ast.ID_Local id) -> (t,id)
+    | _ -> assert false
+  
   let declare fn args_typ =
     let open Ollvm_ast in
-    let (t, ID_Local id) = Value.ident fn in
+    let (t, id) = get_local (Value.ident fn) in
     { dc_type = TYPE_Function (t, args_typ);
       dc_name = id;
       dc_param_attrs = ([], List.map (fun _ -> []) args_typ);
@@ -231,6 +252,7 @@ module Module = struct
 
     (* FIXME: Use better structure than list *)
     let local env t name =
+      let open Ollvm_ast in
       let (env, name) = match name with
         | "" ->
            let i = env.unnamed_counter in
@@ -246,7 +268,7 @@ module Module = struct
                        named_counter = (name, 0) :: env.named_counter },
                      name)
       in
-      (env, (t, Ollvm_ast.SV (Ollvm_ast.VALUE_Ident (Ollvm_ast.ID_Local (Name name)))))
+      (env, (t, SV (VALUE_Ident (ID_Local (Name name)))))
 
   end
 
@@ -258,6 +280,7 @@ module Module = struct
   }
 
   let init name (arch, vendor, os) data_layout =
+    let open Ollvm_ast in
     { m_module = {
         m_name = name ;
         m_target = Ollvm_ast.TLE_Target (arch ^ "-" ^ vendor ^ "-" ^ os) ;
@@ -270,16 +293,19 @@ module Module = struct
 
 
   let set_data_layout m layout =
+    let open Ollvm_ast in 
     { m with
       m_module = { m.m_module with
                    m_datalayout = Ollvm_ast.TLE_Datalayout layout} }
 
   let set_target_triple m arch vendor os =
+    let open Ollvm_ast in 
     { m with
       m_module = { m.m_module with
                    m_target = Ollvm_ast.TLE_Target (arch^"-"^vendor^"-"^os) } }
 
   let local m t name =
+    let open Ollvm_ast in 
     let (env, var) = Local.local m.m_env t name in
     ({m with m_env = env}, var)
 
@@ -298,25 +324,34 @@ module Module = struct
     in loop m [] list
 
   let global m t name =
+    let open Ollvm_ast in 
     let ident = Ollvm_ast.ID_Global (Name name) in
     let var = (t, Ollvm_ast.SV (Ollvm_ast.VALUE_Ident ident)) in
     (m, var)
 
   let lookup_declaration m name =
+    let open Ollvm_ast in 
     List.assoc name m.m_module.m_declarations
 
   let lookup_definition m name =
+    let open Ollvm_ast in 
     List.assoc name m.m_module.m_definitions
 
+  let get_name = function
+    | Ollvm_ast.Name name -> name
+    | _ -> assert false
+  
   let declaration m dc =
-    let Ollvm_ast.Name name = dc.Ollvm_ast.dc_name in
+    let open Ollvm_ast in 
+    let name = get_name dc.dc_name in
     { m with m_module = { m.m_module with
                           m_declarations = (name, dc)
                                            :: m.m_module.m_declarations } }
 
   let definition m df =
-    let { Ollvm_ast.df_prototype = dc; _; } = df in
-    let Ollvm_ast.Name name = dc.dc_name in
+    let open Ollvm_ast in 
+    let { df_prototype = dc; _; } = df in
+    let name = get_name dc.dc_name in
     { m with m_module = { m.m_module with
                           m_declarations = (name, dc)
                                            :: m.m_module.m_declarations ;

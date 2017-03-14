@@ -11,10 +11,11 @@ type env = { c: Llvm.llcontext;
 let lookup env id = List.assoc id env.mem
 
 let lookup_fn env (id : Ollvm.Ast.ident) : Llvm.llvalue = match id with
-  | ID_Local _ -> assert false
-  | ID_Global (Name i) -> match Llvm.lookup_function i env.m with
+  | ID_Global (Name i) -> begin match Llvm.lookup_function i env.m with
                    | Some fn -> fn
-                   | _ -> assert false
+                   | _ -> assert false end
+  | _ -> assert false
+
 
 let string_of_raw_id : Ollvm.Ast.raw_id -> string = function
   | Name s -> s
@@ -78,6 +79,8 @@ let typ_attr : Ollvm.Ast.param_attr -> Llvm.Attribute.t =
   | PARAMATTR_Noalias   -> Noalias
   | PARAMATTR_Nocapture -> Nocapture
   | PARAMATTR_Nest      -> Nest
+  | _ -> failwith "unimplemented"
+
 
 let fn_attr : Ollvm.Ast.fn_attr -> Llvm.Attribute.t =
   let open Llvm.Attribute
@@ -249,6 +252,7 @@ let rec value : env -> Ollvm.Ast.typ -> Ollvm.Ast.value -> Llvm.llvalue =
   | SV (VALUE_Vector v)         ->
      const_vector (Array.of_list v |> Array.map (fun (ty, v) -> value env ty v))
   | SV (VALUE_Zero_initializer) -> assert false
+  | _ -> failwith "unimplemented"
 
 let rec instr : env -> Ollvm.Ast.instr -> (env * Llvm.llvalue) =
   fun env ->
@@ -414,11 +418,15 @@ let rec instr : env -> Ollvm.Ast.instr -> (env * Llvm.llvalue) =
      ({ env with mem = (id, llv) :: env.mem }, llv)
 *)
 
+let name_of_gident = function
+  | Ollvm.Ast.Name name -> name
+  | _ -> assert false
+
 let global : env -> Ollvm.Ast.global -> env =
   fun env g ->
   let llv = value env g.g_typ (match g.g_value with Some x -> x
                                                   | None -> assert false) in
-  let Ollvm.Ast.Name name = g.g_ident in
+  let name = name_of_gident g.g_ident in
   let llv = Llvm.define_global name llv env.m in
   {env with mem = (Ollvm.Ast.ID_Global g.g_ident, llv) :: env.mem }
 
@@ -465,13 +473,21 @@ let definition : env -> Ollvm.Ast.definition -> env =
     List.fold_left (fun env b -> create_block env b fn) env df.df_instrs in
   List.fold_left (fun env bl -> block env bl) env (df.df_instrs)
 
+let get_TLE_Target = function
+  | Ollvm.Ast.TLE_Target target -> target
+  | _ -> assert false
+
+let get_TLE_Datalayout = function
+  | Ollvm.Ast.TLE_Datalayout datalayout -> datalayout
+  | _ -> assert false
+
 let modul : Ollvm.Ast.modul -> env =
   fun modul ->
   let c = Llvm.global_context () in
   let m = Llvm.create_module c modul.m_name in
   let b = Llvm.builder c in
-  let Ollvm.Ast.TLE_Target target = modul.m_target in
-  let Ollvm.Ast.TLE_Datalayout datalayout = modul.m_datalayout in
+  let target = get_TLE_Target modul.m_target in
+  let datalayout = get_TLE_Datalayout modul.m_datalayout in
   Llvm.set_target_triple target m;
   Llvm.set_data_layout datalayout m;
   let env = { c = c; m = m; b = b; mem = []; labels = [] } in

@@ -23,6 +23,11 @@ let find_env (cntr, tbl) i =
                     cntr := i' + 1 ;
                     i'
 
+let get_function_type = function
+  | TYPE_Function (ret_t, args_t) -> ret_t, args_t
+  | _ -> assert false
+
+
 let find_local env = find_env env.local
 
 let find_global env = find_env env.global
@@ -491,7 +496,7 @@ and instr : t -> Format.formatter -> Ollvm_ast.instr -> unit =
      fprintf ppf "phi %a [%a]"
              typ t
              (pp_print_list ~pp_sep:(pp_sep "], [")
-                            (fun ppf (v, i) -> value env ppf v ;
+                            (fun ppf (i, v) -> value env ppf v ;
                                                pp_print_string ppf ", " ;
                                                ident env ppf i)) vil
 
@@ -627,7 +632,7 @@ and global : t -> Format.formatter -> Ollvm_ast.global -> unit =
 and declaration : t -> Format.formatter -> Ollvm_ast.declaration -> unit =
   fun env ppf ->
   fun { dc_name = i
-      ; dc_type = TYPE_Function (ret_t, args_t)
+      ; dc_type 
       ; dc_param_attrs = (ret_attrs, args_attrs)
       ; dc_linkage
       ; dc_visibility
@@ -638,6 +643,7 @@ and declaration : t -> Format.formatter -> Ollvm_ast.declaration -> unit =
       ; dc_align
       ; dc_gc
       } ->
+    let (ret_t, args_t) = get_function_type dc_type in
     let typ_attr =
       fun ppf (t, attrs) ->
         typ ppf t ;
@@ -675,7 +681,7 @@ and definition : t -> Format.formatter -> Ollvm_ast.definition -> unit =
   fun env ppf ->
   fun ({ df_prototype =
            { dc_name = i
-           ; dc_type = TYPE_Function (ret_t, args_t)
+           ; dc_type
            ; dc_param_attrs = (ret_attrs, args_attrs)
            ; dc_linkage
            ; dc_visibility
@@ -687,6 +693,7 @@ and definition : t -> Format.formatter -> Ollvm_ast.definition -> unit =
            ; dc_gc
            }
        } as df) ->
+    let (ret_t, args_t) = get_function_type dc_type in
     let typ_attr_id =
       fun ppf ((t, attrs), id) ->
         typ ppf t ;
