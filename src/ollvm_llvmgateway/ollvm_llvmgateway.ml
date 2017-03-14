@@ -455,7 +455,7 @@ let definition : env -> Ollvm.Ast.definition -> env =
   let env =
     lookup_fn env (Ollvm.Ast.ID_Local df.df_prototype.dc_name)
     |> Llvm.params
-    |> Array.mapi (fun i a -> (List.nth df.df_args i, a ))
+    |> Array.mapi (fun i a -> (Ollvm.Ast.ID_Local (List.nth df.df_args i), a ))
     |> Array.fold_left (fun env (i, a) ->
                         Llvm.set_value_name (string_of_ident i) a;
                         { env with mem = (i, a) :: env.mem }) env in

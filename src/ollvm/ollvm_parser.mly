@@ -435,7 +435,7 @@ param_attr:
                                  { PARAMATTR_Dereferenceable n }
 
 dc_arg: t=typ p=param_attr*         { (t, p)      }
-df_arg: t=typ p=param_attr* i=ident { ((t, p), i) }
+df_arg: t=typ p=param_attr* i=lident { ((t, p), i) }
 call_arg: t=typ i=value             { (t, i)      }
 
 fn_attr:

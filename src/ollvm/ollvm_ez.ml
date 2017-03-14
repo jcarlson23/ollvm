@@ -210,7 +210,7 @@ module Block = struct
     let proto = declare fn (List.map fst args) in
 
     { df_prototype = proto;
-      df_args = List.map snd args;
+      df_args = List.map extract_name (List.map snd args);
       df_instrs = blocks;
     }
 

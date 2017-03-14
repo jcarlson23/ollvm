@@ -128,6 +128,13 @@ and str_of_raw_id : Ollvm_ast.raw_id -> string =
     | Anon i -> Printf.sprintf "%d" i
     | Name s -> s
 
+and lident : Format.formatter -> Ollvm_ast.local_id -> unit =
+  fun ppf i -> pp_print_char ppf '%' ; pp_print_string ppf (str_of_raw_id i)
+
+and gident : Format.formatter -> Ollvm_ast.global_id -> unit =
+  fun ppf i -> pp_print_char ppf '@' ; pp_print_string ppf (str_of_raw_id i)
+
+
 and ident : t -> Format.formatter -> Ollvm_ast.ident -> unit =
 
   (* let ident_format : (string -> int) -> Format.formatter -> string -> unit = *)
@@ -137,8 +144,8 @@ and ident : t -> Format.formatter -> Ollvm_ast.ident -> unit =
 
   fun env ppf ->
   function
-  | ID_Global i -> pp_print_char ppf '@' ; pp_print_string ppf (str_of_raw_id i)
-  | ID_Local i  -> pp_print_char ppf '%' ; pp_print_string ppf (str_of_raw_id i)
+  | ID_Global i -> gident ppf i
+  | ID_Local i  -> lident ppf i
 
 and typ : Format.formatter -> Ollvm_ast.typ -> unit =
   fun ppf ->
@@ -687,7 +694,7 @@ and definition : t -> Format.formatter -> Ollvm_ast.definition -> unit =
         if attrs <> [] then (pp_print_list ~pp_sep:pp_space
                                param_attr ppf attrs ;
                              pp_space ppf ()) ;
-        (ident env) ppf id
+        lident ppf id
     in
     pp_print_string ppf "define " ;
     (match dc_linkage with
