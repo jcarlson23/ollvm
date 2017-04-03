@@ -1,5 +1,9 @@
 open Format
 
+let str = Camlcoq.coqstring_of_camlstring
+let of_str = Camlcoq.camlstring_of_coqstring
+
+
 (* Backward compatibility with 4.01.0 *)
 let rec pp_print_list ?(pp_sep = Format.pp_print_cut) pp_v ppf = function
 | [] -> ()
@@ -124,14 +128,14 @@ and fn_attr : Format.formatter -> Ollvm_ast.fn_attr -> unit =
   | FNATTR_Sspreq           -> fprintf ppf "sspreq"
   | FNATTR_Sspstrong        -> fprintf ppf "sspstrong"
   | FNATTR_Uwtable          -> fprintf ppf "uwtable"
-  | FNATTR_String s         -> fprintf ppf "\"%s\"" s
-  | FNATTR_Key_value (k, v) -> fprintf ppf "\"%s\"=\"%s\"" k v
+  | FNATTR_String s         -> fprintf ppf "\"%s\"" (of_str s)
+  | FNATTR_Key_value (k, v) -> fprintf ppf "\"%s\"=\"%s\"" (of_str k) (of_str v)
   | FNATTR_Attr_grp i       -> fprintf ppf "#%d" i
 
 and str_of_raw_id : Ollvm_ast.raw_id -> string =
     function
     | Anon i -> Printf.sprintf "%d" i
-    | Name s -> s
+    | Name s -> (of_str s)
 
 and lident : Format.formatter -> Ollvm_ast.local_id -> unit =
   fun ppf i -> pp_print_char ppf '%' ; pp_print_string ppf (str_of_raw_id i)
@@ -285,7 +289,7 @@ and value : t -> Format.formatter -> Ollvm_ast.value -> unit =
                                        (pp_print_list ~pp_sep:pp_comma_space (tvalue env)) tvl
   | VALUE_Zero_initializer  -> pp_print_string ppf "zeroinitializer"
 
-  | VALUE_Cstring s -> fprintf ppf "c\"%s\"" s
+  | VALUE_Cstring s -> fprintf ppf "c\"%s\"" (of_str s)
 
   | VALUE_None -> fprintf ppf "none"
   
@@ -580,9 +584,9 @@ and toplevel_entities : t -> Format.formatter -> Ollvm_ast.toplevel_entities -> 
 and toplevel_entity : t -> Format.formatter -> Ollvm_ast.toplevel_entity -> unit =
   fun env ppf ->
   function
-  | TLE_Target s               -> fprintf ppf "target triple = \"%s\"" s
-  | TLE_Datalayout s           -> fprintf ppf "target datalayout = \"%s\"" s
-  | TLE_Source_filename s      -> fprintf ppf "source_filename = \"%s\"" s
+  | TLE_Target s               -> fprintf ppf "target triple = \"%s\"" (of_str s)
+  | TLE_Datalayout s           -> fprintf ppf "target datalayout = \"%s\"" (of_str s)
+  | TLE_Source_filename s      -> fprintf ppf "source_filename = \"%s\"" (of_str s)
   | TLE_Declaration d          -> declaration env ppf d
   | TLE_Definition d           -> definition env ppf d
   | TLE_Type_decl (i, t)       -> fprintf ppf "%a = type %a" (ident env) i typ t
@@ -597,13 +601,13 @@ and metadata : t -> Format.formatter -> Ollvm_ast.metadata -> unit =
   | METADATA_Const v  -> tvalue env ppf v
   | METADATA_Null     -> pp_print_string ppf "null"
   | METADATA_Id i     -> fprintf ppf "!%s" (str_of_raw_id i)
-  | METADATA_String s -> fprintf ppf "!%s" s
+  | METADATA_String s -> fprintf ppf "!%s" (of_str s)
   | METADATA_Node m   -> fprintf ppf "!{%a}"
                                  (pp_print_list ~pp_sep:pp_comma_space (metadata env)) m
   | METADATA_Named m  -> fprintf ppf "!{%a}"
                                  (pp_print_list ~pp_sep:pp_comma_space
                                                 (fun ppf i ->
-                                                 fprintf ppf "!%s" i)) m
+                                                 fprintf ppf "!%s" i)) (List.map of_str m)
 and global : t -> Format.formatter -> Ollvm_ast.global -> unit =
   fun env ppf ->
   fun {
@@ -625,7 +629,7 @@ and global : t -> Format.formatter -> Ollvm_ast.global -> unit =
        (fprintf ppf "%s %a" (if g_constant then "constant" else "global") typ g_typ) ;
        (match g_value with None -> () | Some v -> (pp_print_string ppf " "; (value env) ppf v)) ;
        (match s with None -> ()
-                   | Some s -> fprintf ppf ", section %s" s) ;
+                   | Some s -> fprintf ppf ", section %s" (of_str s)) ;
        (match a with None -> ()
                    | Some a -> fprintf ppf ", align %d" a)
 
@@ -665,17 +669,17 @@ and declaration : t -> Format.formatter -> Ollvm_ast.declaration -> unit =
     if ret_attrs <> [] then (pp_print_list ~pp_sep:pp_space
                                param_attr ppf ret_attrs ;
                              pp_space ppf ()) ;
-    fprintf ppf "%a %%%s(%a)"
+    fprintf ppf "%a @%s(%a)"
       typ ret_t
       (str_of_raw_id i)
       (pp_print_list ~pp_sep:pp_comma_space typ_attr)
       (List.combine args_t args_attrs);
     (match dc_section with
-       Some x -> fprintf ppf "section \"%s\" " x | _ -> ()) ;
+       Some x -> fprintf ppf "section \"%s\" " (of_str x) | _ -> ()) ;
     (match dc_align with
        Some x -> fprintf ppf "align %d " x | _ -> ()) ;
     (match dc_gc with
-       Some x -> fprintf ppf "gc \"%s\" " x | _ -> ()) 
+       Some x -> fprintf ppf "gc \"%s\" " (of_str x) | _ -> ()) 
     
 and definition : t -> Format.formatter -> Ollvm_ast.definition -> unit =
   fun env ppf ->
@@ -719,7 +723,7 @@ and definition : t -> Format.formatter -> Ollvm_ast.definition -> unit =
     if ret_attrs <> [] then (pp_print_list ~pp_sep:pp_space
                                param_attr ppf ret_attrs ;
                              pp_space ppf ()) ;
-    fprintf ppf "%a %%%s(%a) "
+    fprintf ppf "%a @%s(%a) "
       typ ret_t
       (str_of_raw_id i)
       (pp_print_list ~pp_sep:pp_comma_space typ_attr_id)
@@ -728,11 +732,11 @@ and definition : t -> Format.formatter -> Ollvm_ast.definition -> unit =
                               fn_attr ppf dc_attrs ;
                             pp_space ppf ()) ;
     (match dc_section with
-       Some x -> fprintf ppf "section \"%s\" " x | _ -> ()) ;
+       Some x -> fprintf ppf "section \"%s\" " (of_str x) | _ -> ()) ;
     (match dc_align with
        Some x -> fprintf ppf "align %d " x | _ -> ()) ;
     (match dc_gc with
-       Some x -> fprintf ppf "gc \"%s\" " x | _ -> ()) ;
+       Some x -> fprintf ppf "gc \"%s\" " (of_str x) | _ -> ()) ;
     pp_print_char ppf '{' ;
     pp_force_newline ppf () ;
     pp_print_list ~pp_sep:pp_force_newline (block env) ppf df.df_instrs ;
@@ -743,7 +747,7 @@ and block : t -> Format.formatter -> Ollvm_ast.block -> unit =
   fun env ppf {blk_id=lbl; blk_instrs=b; blk_term=t} ->
     begin match lbl with
       | Anon i -> fprintf ppf "; <label> %d" i
-      | Name s -> (pp_print_string ppf s; pp_print_char ppf ':')
+      | Name s -> (pp_print_string ppf (of_str s); pp_print_char ppf ':')
     end;
     pp_force_newline ppf () ;
     pp_print_string ppf "  ";
@@ -756,7 +760,7 @@ and block : t -> Format.formatter -> Ollvm_ast.block -> unit =
 and modul : t -> Format.formatter -> Ollvm_ast.modul -> unit =
   fun env ppf m ->
 
-  fprintf ppf "; ModuleID = '%s'" m.m_name ;
+  fprintf ppf "; ModuleID = '%s'" (of_str m.m_name) ;
   pp_force_newline ppf () ;
 
   toplevel_entity env ppf m.m_target ;

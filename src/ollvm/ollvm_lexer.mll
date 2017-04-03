@@ -20,7 +20,9 @@
 
 {
   open Ollvm_parser
-
+  let str = Camlcoq.coqstring_of_camlstring
+  let of_str = Camlcoq.camlstring_of_coqstring
+  
   exception Lex_error_unterminated_string of Lexing.position
 
   let kw = function
@@ -277,8 +279,10 @@ rule token = parse
   | "!{" { BANGLCURLY }
   | '!'  { let rid = raw_id lexbuf in
            begin match rid with 
-           | Ollvm_ast.Name id -> (if id.[0] = '"' && id.[String.length id - 1] = '"'
-               then METADATA_STRING (id)
+           | Ollvm_ast.Name id ->
+	   let id = of_str id in
+	   (if id.[0] = '"' && id.[String.length id - 1] = '"'
+               then METADATA_STRING id
                else METADATA_ID rid)
 	   | Ollvm_ast.Anon _ -> METADATA_ID rid
 	   end
@@ -310,9 +314,9 @@ and string buf = parse
   | _ as c { Buffer.add_char buf c; string buf lexbuf }
 
 and raw_id = parse
-  | ident_fst ident_nxt* as i { Ollvm_ast.Name i }
+  | ident_fst ident_nxt* as i { Ollvm_ast.Name (str i) }
   | digit+ as i               { Ollvm_ast.Anon (int_of_string i) }
-  | '"'                       { Ollvm_ast.Name ("\"" ^ string (Buffer.create 10) lexbuf ^ "\"") }
+  | '"'                       { Ollvm_ast.Name (str ("\"" ^ string (Buffer.create 10) lexbuf ^ "\"")) }
 
 {
 

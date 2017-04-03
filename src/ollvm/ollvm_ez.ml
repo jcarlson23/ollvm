@@ -1,3 +1,6 @@
+let str = Camlcoq.coqstring_of_camlstring
+let of_str = Camlcoq.camlstring_of_coqstring
+
 module Type = struct
 
   open Ollvm_ast
@@ -268,7 +271,7 @@ module Module = struct
                        named_counter = (name, 0) :: env.named_counter },
                      name)
       in
-      (env, (t, SV (VALUE_Ident (ID_Local (Name name)))))
+      (env, (t, SV (VALUE_Ident (ID_Local (Name (str name))))))
 
   end
 
@@ -281,9 +284,11 @@ module Module = struct
 
   let init name (arch, vendor, os) data_layout =
     let open Ollvm_ast in
+    let name = str name in
+    let data_layout = str data_layout in
     { m_module = {
         m_name = name ;
-        m_target = Ollvm_ast.TLE_Target (arch ^ "-" ^ vendor ^ "-" ^ os) ;
+        m_target = Ollvm_ast.TLE_Target (str (arch ^ "-" ^ vendor ^ "-" ^ os)) ;
         m_datalayout = Ollvm_ast.TLE_Datalayout data_layout ;
         m_globals = [] ;
         m_declarations = [] ;
@@ -293,7 +298,8 @@ module Module = struct
 
 
   let set_data_layout m layout =
-    let open Ollvm_ast in 
+    let open Ollvm_ast in
+    let layout = str layout in
     { m with
       m_module = { m.m_module with
                    m_datalayout = Ollvm_ast.TLE_Datalayout layout} }
@@ -302,7 +308,7 @@ module Module = struct
     let open Ollvm_ast in 
     { m with
       m_module = { m.m_module with
-                   m_target = Ollvm_ast.TLE_Target (arch^"-"^vendor^"-"^os) } }
+                   m_target = Ollvm_ast.TLE_Target (str (arch^"-"^vendor^"-"^os)) } }
 
   let local m t name =
     let open Ollvm_ast in 
@@ -324,28 +330,31 @@ module Module = struct
     in loop m [] list
 
   let global m t name =
-    let open Ollvm_ast in 
+    let open Ollvm_ast in
+    let name = str name in
     let ident = Ollvm_ast.ID_Global (Name name) in
     let var = (t, Ollvm_ast.SV (Ollvm_ast.VALUE_Ident ident)) in
     (m, var)
 
   let lookup_declaration m name =
-    let open Ollvm_ast in 
+    let open Ollvm_ast in
+    let name = str name in
     List.assoc name m.m_module.m_declarations
 
   let lookup_definition m name =
-    let open Ollvm_ast in 
+    let open Ollvm_ast in
+    let name = str name in
     List.assoc name m.m_module.m_definitions
 
   let get_name = function
-    | Ollvm_ast.Name name -> name
+    | Ollvm_ast.Name name -> (of_str name)
     | _ -> assert false
   
   let declaration m dc =
     let open Ollvm_ast in 
     let name = get_name dc.dc_name in
     { m with m_module = { m.m_module with
-                          m_declarations = (name, dc)
+                          m_declarations = (str name, dc)
                                            :: m.m_module.m_declarations } }
 
   let definition m df =
@@ -353,9 +362,9 @@ module Module = struct
     let { df_prototype = dc; _; } = df in
     let name = get_name dc.dc_name in
     { m with m_module = { m.m_module with
-                          m_declarations = (name, dc)
+                          m_declarations = (str name, dc)
                                            :: m.m_module.m_declarations ;
-                          m_definitions = (name, df)
+                          m_definitions = (str name, df)
                                           :: m.m_module.m_definitions } }
 
 end

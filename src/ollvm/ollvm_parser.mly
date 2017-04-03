@@ -23,6 +23,8 @@
 
 open Ollvm_ast
 
+let str = Camlcoq.coqstring_of_camlstring
+
 (* att type is a workaround to simplify parsing of optionnal keywords in
  * global / function declaration / definition.
  * It is far from what would be ideal since it will allow to parse silly
@@ -54,7 +56,7 @@ let get_fn_attrs l =
   | Some l -> l
 
 let get_section =
-  get_opt (function OPT_section s -> Some s | _ -> None)
+  get_opt (function OPT_section s -> Some (str s) | _ -> None)
 
 let get_align =
   get_opt (function OPT_align a -> Some a | _ -> None)
@@ -78,7 +80,7 @@ let get_thread_local =
   get_opt (function OPT_thread_local x -> Some x | _ -> None)
 
 let get_gc =
-  get_opt (function OPT_gc x -> Some x | _ -> None)
+  get_opt (function OPT_gc x -> Some (str x) | _ -> None)
 
 let is_unnamed_addr l =
   None <> get_opt (function OPT_unnamed_addr -> Some () | _ -> None) l
@@ -170,9 +172,9 @@ toplevel_entities:
 toplevel_entity:
   | d=definition                        { TLE_Definition d               }
   | d=declaration                       { TLE_Declaration d              }
-  | KW_TARGET KW_DATALAYOUT EQ s=STRING { TLE_Datalayout s               }
-  | KW_TARGET KW_TRIPLE EQ s=STRING     { TLE_Target s                   }
-  | KW_SOURCE_FILENAME EQ s=STRING      { TLE_Source_filename s          }
+  | KW_TARGET KW_DATALAYOUT EQ s=STRING { TLE_Datalayout (str s)         }
+  | KW_TARGET KW_TRIPLE EQ s=STRING     { TLE_Target (str s)             }
+  | KW_SOURCE_FILENAME EQ s=STRING      { TLE_Source_filename (str s)    }
   | i=LOCAL EQ KW_TYPE t=typ            { TLE_Type_decl (ID_Local i, t)  }
   | g=global_decl                       { TLE_Global g                   }
   | i=METADATA_ID EQ m=tle_metadata     { TLE_Metadata (i, m)            }
@@ -193,9 +195,9 @@ metadata_node:
 metadata_value:
   | tconst                      { METADATA_Const $1  }
   | KW_NULL                     { METADATA_Null      } (* null with no type *)
-  | ms=METADATA_STRING          { METADATA_String ms }
+  | ms=METADATA_STRING          { METADATA_String (str ms) }
   | mid=METADATA_ID             { METADATA_Id mid     }
-  | mn=metadata_node            { mn                 }
+  | mn=metadata_node            { mn                  }
 
 
 global_decl:
@@ -319,13 +321,13 @@ definition:
         } }
 
 df_blocks:
-  | bs=pair(terminated(LABEL, EOL+)?, pair(terminated(id_instr, EOL+)+, terminated(terminator, EOL+)))*
+  | bs=pair(terminated(LABEL, EOL+)?, pair(terminated(id_instr, EOL+)*, terminated(terminator, EOL+)))*
   { let _ = anon_ctr.reset () in
     let _ = void_ctr.reset () in
     List.map (fun (lbl, (instrs, term)) ->
     	     let l = match lbl with
       	     	     | None -> Anon (anon_ctr.get ())
-                     | Some s -> Name s
+                     | Some s -> Name (str s)
 	     in let iis = List.map (fun (id, inst) ->
                                    match id with 
                                    | None -> (id_of inst, inst)
@@ -467,8 +469,8 @@ fn_attr:
   | KW_SSPREQ                             { FNATTR_Sspreq           }
   | KW_SSPSTRONG                          { FNATTR_Sspstrong        }
   | KW_UWTABLE                            { FNATTR_Uwtable          }
-  | s=STRING                              { FNATTR_String s         }
-  | k=STRING EQ v=STRING                  { FNATTR_Key_value (k, v) }
+  | s=STRING                              { FNATTR_String (str s)   }
+  | k=STRING EQ v=STRING                  { FNATTR_Key_value (str k, str v) }
   | i=ATTR_GRP_ID                         { FNATTR_Attr_grp i       }
 
 align: KW_ALIGN p=INTEGER { p }
@@ -608,7 +610,7 @@ expr_val:
   | LSQUARE l=separated_list(csep, tconst) RSQUARE    { SV (VALUE_Array l)          }
   | LT l=separated_list(csep, tconst) GT              { SV (VALUE_Vector l)         }
   | i=ident                                           { SV (VALUE_Ident i)          }
-  | KW_C cstr=STRING                                  { SV (VALUE_Cstring cstr)     }
+  | KW_C cstr=STRING                                  { SV (VALUE_Cstring (str cstr))     }
 
 value:
   | eo=expr_op { eo }

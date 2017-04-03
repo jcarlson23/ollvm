@@ -1,6 +1,6 @@
 LIBNAME=ollvm
 GENERATED=$(LIBNAME)_lexer.mli $(LIBNAME)_lexer.ml $(LIBNAME)_parser.mli $(LIBNAME)_parser.ml 
-ASTDIR:=../../../ast
+ASTDIR:=../../../coq
 CAMLFLAGS=-I $(ASTDIR)/
 
 SOURCES = \
