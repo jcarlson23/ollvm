@@ -22,7 +22,8 @@
   open Ollvm_parser
   let str = Camlcoq.coqstring_of_camlstring
   let of_str = Camlcoq.camlstring_of_coqstring
-  
+  let coq_of_int = Camlcoq.Z.of_sint
+
   exception Lex_error_unterminated_string of Lexing.position
 
   let kw = function
@@ -288,17 +289,17 @@ rule token = parse
 	   end
          }
 
-  | '#' (digit+ as i) { ATTR_GRP_ID (int_of_string i) }
+  | '#' (digit+ as i) { ATTR_GRP_ID (coq_of_int (int_of_string i)) }
 
   (* constants *)
-  | '-'? digit+ as d            { INTEGER (int_of_string d) }
+  | '-'? digit+ as d            { INTEGER (coq_of_int (int_of_string d)) }
   | '-'? digit* '.' digit+ as d { FLOAT (float_of_string d) }
   | '-'? digit ('.' digit+)? 'e' ('+'|'-') digit+ as d
                                 { FLOAT (float_of_string d) }
   | '"'                         { STRING (string (Buffer.create 10) lexbuf) }
 
   (* types *)
-  | 'i' (digit+ as i) { I (int_of_string i) }
+  | 'i' (digit+ as i) { I (coq_of_int (int_of_string i)) }
   | '*' { STAR }
 
   (* keywords *)
@@ -315,7 +316,7 @@ and string buf = parse
 
 and raw_id = parse
   | ident_fst ident_nxt* as i { Ollvm_ast.Name (str i) }
-  | digit+ as i               { Ollvm_ast.Anon (int_of_string i) }
+  | digit+ as i               { Ollvm_ast.Anon (coq_of_int (int_of_string i)) }
   | '"'                       { Ollvm_ast.Name (str ("\"" ^ string (Buffer.create 10) lexbuf ^ "\"")) }
 
 {

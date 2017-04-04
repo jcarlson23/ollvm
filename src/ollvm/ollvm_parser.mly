@@ -5,6 +5,7 @@
   * Copyright (c) 2012 INRIA - Raphaël Proust <raphlalou@gmail.com>          *
   * Copyright (c) 2012 ENS - Raphaël Proust <raphlalou@gmail.com>            *
   * Copyright (c) 2014 OCamlPro - Julien Sagot <ju.sagot@gmail.com>          *
+  * Copyright (c) 2017 U. Penn. Steve Zdancewic <stevez@cis.upenn.edu>       *
   *                                                                          *
   * Permission to use, copy, modify, and distribute this software for any    *
   * purpose with or without fee is hereby granted, provided that the above   *
@@ -24,6 +25,7 @@
 open Ollvm_ast
 
 let str = Camlcoq.coqstring_of_camlstring
+let coq_of_int = Camlcoq.Z.of_sint
 
 (* att type is a workaround to simplify parsing of optionnal keywords in
  * global / function declaration / definition.
@@ -34,12 +36,12 @@ let str = Camlcoq.coqstring_of_camlstring
 
 type att =
   | OPT_fn_attr of fn_attr list
-  | OPT_align of int
+  | OPT_align of Camlcoq.Z.t
   | OPT_section of string
   | OPT_linkage of linkage
   | OPT_visibility of visibility
   | OPT_thread_local of thread_local_storage
-  | OPT_addrspace of int
+  | OPT_addrspace of Camlcoq.Z.t
   | OPT_unnamed_addr
   | OPT_cconv of cconv
   | OPT_dll_storage of dll_storage
@@ -93,7 +95,7 @@ type ctr = {get : unit -> int; reset : unit -> unit}
 let mk_counter () =
   let c = ref 0 in
   {
-    get = (fun () -> let cnt = !c in incr c; cnt);
+    get = (fun () -> let cnt = !c in incr c; coq_of_int cnt);
     reset = (fun () -> c := 0);
   }
 
@@ -126,7 +128,7 @@ let id_of = function
 %token LPAREN RPAREN LCURLY RCURLY LTLCURLY RCURLYGT LSQUARE RSQUARE LT GT EQ COMMA EOF EOL STAR
 
 %token<string> STRING
-%token<int> INTEGER
+%token<Camlcoq.Z.t> INTEGER
 %token<float> FLOAT
 %token KW_NULL KW_UNDEF KW_TRUE KW_FALSE KW_ZEROINITIALIZER KW_C
 
@@ -145,7 +147,7 @@ let id_of = function
 %token KW_GC
 %token KW_ADD KW_FADD KW_SUB KW_FSUB KW_MUL KW_FMUL KW_UDIV KW_SDIV KW_FDIV KW_UREM KW_SREM KW_FREM KW_SHL KW_LSHR KW_ASHR KW_AND KW_OR KW_XOR KW_ICMP KW_FCMP KW_PHI KW_CALL KW_TRUNC KW_ZEXT KW_SEXT KW_FPTRUNC KW_FPEXT KW_UITOFP KW_SITOFP KW_FPTOUI KW_FPTOSI KW_INTTOPTR KW_PTRTOINT KW_BITCAST KW_SELECT KW_VAARG KW_RET KW_BR KW_SWITCH KW_INDIRECTBR KW_INVOKE KW_RESUME KW_UNREACHABLE KW_ALLOCA KW_LOAD KW_STORE KW_ATOMICCMPXCHG KW_ATOMICRMW KW_FENCE KW_GETELEMENTPTR KW_INBOUNDS KW_EXTRACTELEMENT KW_INSERTELEMENT KW_SHUFFLEVECTOR KW_EXTRACTVALUE KW_INSERTVALUE KW_LANDINGPAD
 %token KW_NNAN KW_NINF KW_NSZ KW_ARCP KW_FAST
-%token<int> I
+%token<Camlcoq.Z.t> I
 %token KW_VOID KW_HALF KW_FLOAT KW_DOUBLE KW_X86_FP80 KW_FP128 KW_PPC_FP128 KW_LABEL KW_METADATA KW_X86_MMX
 %token KW_UNWIND KW_TO
 %token KW_NUW KW_NSW
@@ -160,7 +162,7 @@ let id_of = function
 %token<string> METADATA_STRING
 %token BANGLCURLY
 %token KW_ATTRIBUTES
-%token<int> ATTR_GRP_ID
+%token<Camlcoq.Z.t> ATTR_GRP_ID
 
 %start<Ollvm_ast.toplevel_entities> toplevel_entities
 

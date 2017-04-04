@@ -2,7 +2,7 @@ open Format
 
 let str = Camlcoq.coqstring_of_camlstring
 let of_str = Camlcoq.camlstring_of_coqstring
-
+let to_int = Camlcoq.Z.to_int
 
 (* Backward compatibility with 4.01.0 *)
 let rec pp_print_list ?(pp_sep = Format.pp_print_cut) pp_v ppf = function
@@ -13,30 +13,10 @@ let rec pp_print_list ?(pp_sep = Format.pp_print_cut) pp_v ppf = function
 
 open Ollvm_ast
 
-type t = { local: int ref * (int, int) Hashtbl.t;
-           global: int ref * (int, int) Hashtbl.t }
-
-let empty_env () = { local = ref 0, Hashtbl.create 0 ;
-                     global = ref 0, Hashtbl.create 0 }
-
-let find_env (cntr, tbl) i =
-  let i = int_of_string i in
-  try Hashtbl.find tbl i
-  with Not_found -> let i' = !cntr in
-                    Hashtbl.add tbl i i' ;
-                    cntr := i' + 1 ;
-                    i'
-
-let get_function_type = function
-  | TYPE_Function (ret_t, args_t) -> ret_t, args_t
-  | _ -> assert false
-
-
-let find_local env = find_env env.local
-
-let find_global env = find_env env.global
-
-let reset_local env = { env with local = ref 0, Hashtbl.create 0 }
+let get_function_type dc_type =
+  match dc_type with
+  | TYPE_Function(ret,args) -> (ret,args)
+  | _ -> failwith "not a function type"
 
 let pp_sep str =
   fun ppf () -> pp_print_string ppf str
@@ -78,7 +58,7 @@ and cconv : Format.formatter -> Ollvm_ast.cconv -> unit =
           | CC_Ccc    -> fprintf ppf "ccc"
           | CC_Fastcc -> fprintf ppf "fastcc"
           | CC_Coldcc -> fprintf ppf "coldcc"
-          | CC_Cc i   -> fprintf ppf "cc %d" i
+          | CC_Cc i   -> fprintf ppf "cc %d" (to_int i)
 
 and param_attr : Format.formatter -> Ollvm_ast.param_attr -> unit =
   fun ppf ->
@@ -89,18 +69,18 @@ and param_attr : Format.formatter -> Ollvm_ast.param_attr -> unit =
   | PARAMATTR_Byval             -> fprintf ppf "byval"
   | PARAMATTR_Inalloca          -> fprintf ppf "inalloca"
   | PARAMATTR_Sret              -> fprintf ppf "sret"
-  | PARAMATTR_Align n           -> fprintf ppf "align %d" n
+  | PARAMATTR_Align n           -> fprintf ppf "align %d" (to_int n)
   | PARAMATTR_Noalias           -> fprintf ppf "noalias"
   | PARAMATTR_Nocapture         -> fprintf ppf "nocapture"
   | PARAMATTR_Nest              -> fprintf ppf "nest"
   | PARAMATTR_Returned          -> fprintf ppf "returned"
   | PARAMATTR_Nonnull           -> fprintf ppf "nonnull"
-  | PARAMATTR_Dereferenceable n -> fprintf ppf "dereferenceable(%d)" n
+  | PARAMATTR_Dereferenceable n -> fprintf ppf "dereferenceable(%d)" (to_int n)
 
 and fn_attr : Format.formatter -> Ollvm_ast.fn_attr -> unit =
   fun ppf ->
   function
-  | FNATTR_Alignstack i     -> fprintf ppf "alignstack(%d)" i
+  | FNATTR_Alignstack i     -> fprintf ppf "alignstack(%d)" (to_int i)
   | FNATTR_Alwaysinline     -> fprintf ppf "alwaysinline"
   | FNATTR_Builtin          -> fprintf ppf "builtin"
   | FNATTR_Cold             -> fprintf ppf "cold"
@@ -130,11 +110,11 @@ and fn_attr : Format.formatter -> Ollvm_ast.fn_attr -> unit =
   | FNATTR_Uwtable          -> fprintf ppf "uwtable"
   | FNATTR_String s         -> fprintf ppf "\"%s\"" (of_str s)
   | FNATTR_Key_value (k, v) -> fprintf ppf "\"%s\"=\"%s\"" (of_str k) (of_str v)
-  | FNATTR_Attr_grp i       -> fprintf ppf "#%d" i
+  | FNATTR_Attr_grp i       -> fprintf ppf "#%d" (to_int i)
 
 and str_of_raw_id : Ollvm_ast.raw_id -> string =
     function
-    | Anon i -> Printf.sprintf "%d" i
+    | Anon i -> Printf.sprintf "%d" (to_int i)
     | Name s -> (of_str s)
 
 and lident : Format.formatter -> Ollvm_ast.local_id -> unit =
@@ -144,14 +124,14 @@ and gident : Format.formatter -> Ollvm_ast.global_id -> unit =
   fun ppf i -> pp_print_char ppf '@' ; pp_print_string ppf (str_of_raw_id i)
 
 
-and ident : t -> Format.formatter -> Ollvm_ast.ident -> unit =
+and ident : Format.formatter -> Ollvm_ast.ident -> unit =
 
   (* let ident_format : (string -> int) -> Format.formatter -> string -> unit = *)
   (* fun finder ppf i -> *)
   (* if i.[0] >= '0' && i.[0] <= '9' then pp_print_int ppf (finder i) *)
   (* else pp_print_string ppf i in *)
 
-  fun env ppf ->
+  fun ppf ->
   function
   | ID_Global i -> gident ppf i
   | ID_Local i  -> lident ppf i
@@ -159,7 +139,7 @@ and ident : t -> Format.formatter -> Ollvm_ast.ident -> unit =
 and typ : Format.formatter -> Ollvm_ast.typ -> unit =
   fun ppf ->
   function
-  | TYPE_I i              -> fprintf ppf "i%d" i
+  | TYPE_I i              -> fprintf ppf "i%d" (to_int i)
   | TYPE_Pointer t        -> fprintf ppf "%a*" typ t ;
   | TYPE_Void             -> fprintf ppf "void"
   | TYPE_Half             -> fprintf ppf "half"
@@ -171,15 +151,15 @@ and typ : Format.formatter -> Ollvm_ast.typ -> unit =
   | TYPE_Ppc_fp128        -> fprintf ppf "ppc_fp128"
   | TYPE_Metadata         -> fprintf ppf "metadata"
   | TYPE_X86_mmx          -> fprintf ppf "x86_mmx"
-  | TYPE_Array (i, t)     -> fprintf ppf "[%d x %a]" i typ t ;
+  | TYPE_Array (i, t)     -> fprintf ppf "[%d x %a]" (to_int i) typ t ;
   | TYPE_Function (t, tl) -> fprintf ppf "%a (%a)" typ t (pp_print_list ~pp_sep:pp_comma_space typ) tl
   | TYPE_Struct tl        -> fprintf ppf "{%a}"
                                      (pp_print_list ~pp_sep:pp_comma_space typ) tl
   | TYPE_Packed_struct tl -> fprintf ppf "<{%a}>"
                                      (pp_print_list ~pp_sep:pp_comma_space typ) tl
   | TYPE_Opaque           -> fprintf ppf "opaque"
-  | TYPE_Vector (i, t)    -> fprintf ppf "<%d x %a>" i typ t ;
-  | TYPE_Identified i     -> ident (empty_env ()) ppf i
+  | TYPE_Vector (i, t)    -> fprintf ppf "<%d x %a>" (to_int i) typ t ;
+  | TYPE_Identified i     -> ident ppf i
 
 and icmp : Format.formatter -> Ollvm_ast.icmp -> unit =
   fun ppf icmp ->
@@ -270,23 +250,23 @@ and conversion_type : Format.formatter -> Ollvm_ast.conversion_type -> unit =
                | Ptrtoint -> "ptrtoint"
                | Bitcast  -> "bitcast")
 
-and value : t -> Format.formatter -> Ollvm_ast.value -> unit =
-  fun env ppf (SV vv) ->
+and value : Format.formatter -> Ollvm_ast.value -> unit =
+  fun (ppf:Format.formatter) (SV vv) ->
     match vv with
-  | VALUE_Ident i           -> ident env ppf i
-  | VALUE_Integer i         -> pp_print_int ppf i
+  | VALUE_Ident i           -> ident ppf i
+  | VALUE_Integer i         -> pp_print_int ppf (to_int i)
   | VALUE_Float f           -> pp_print_float ppf f
   | VALUE_Bool b            -> pp_print_bool ppf b
   | VALUE_Null              -> pp_print_string ppf "null"
   | VALUE_Undef             -> pp_print_string ppf "undef"
   | VALUE_Array tvl         -> fprintf ppf "[%a]"
-                                       (pp_print_list ~pp_sep:pp_comma_space (tvalue env)) tvl
+                                       (pp_print_list ~pp_sep:pp_comma_space tvalue) tvl
   | VALUE_Vector tvl        -> fprintf ppf "<%a>"
-                                       (pp_print_list ~pp_sep:pp_comma_space (tvalue env)) tvl
+                                       (pp_print_list ~pp_sep:pp_comma_space tvalue) tvl
   | VALUE_Struct tvl        -> fprintf ppf "{%a}"
-                                       (pp_print_list ~pp_sep:pp_comma_space (tvalue env)) tvl
+                                       (pp_print_list ~pp_sep:pp_comma_space tvalue) tvl
   | VALUE_Packed_struct tvl -> fprintf ppf "<{%a}>"
-                                       (pp_print_list ~pp_sep:pp_comma_space (tvalue env)) tvl
+                                       (pp_print_list ~pp_sep:pp_comma_space tvalue) tvl
   | VALUE_Zero_initializer  -> pp_print_string ppf "zeroinitializer"
 
   | VALUE_Cstring s -> fprintf ppf "c\"%s\"" (of_str s)
@@ -297,17 +277,17 @@ and value : t -> Format.formatter -> Ollvm_ast.value -> unit =
      fprintf ppf "%a (%a %a, %a %a)"
              ibinop op
              typ t
-             (value env) v1
+             value v1
              typ t
-             (value env) v2
+             value v2
 
   | OP_ICmp (c, t, v1, v2) ->
      fprintf ppf "icmp %a (%a %a, %a %a)"
              icmp c
              typ t
-             (value env) v1
+             value v1
              typ t
-             (value env) v2
+             value v2
 
   | OP_FBinop (op, f, t, v1, v2) ->
      fbinop ppf op ;
@@ -315,67 +295,67 @@ and value : t -> Format.formatter -> Ollvm_ast.value -> unit =
                       pp_print_list ~pp_sep:pp_space fast_math ppf f) ;
      fprintf ppf " (%a %a, %a %a)"
              typ t
-             (value env) v1
+             value v1
              typ t
-             (value env) v2
+             value v2
 
   | OP_FCmp (c, t, v1, v2) ->
      fprintf ppf "fcmp %a (%a %a, %a %a)"
              fcmp c
              typ t
-             (value env) v1
+             value v1
              typ t
-             (value env) v2
+             value v2
 
   | OP_Conversion (c, t1, v, t2) ->
      fprintf ppf "%a (%a %a to %a)"
              conversion_type c
              typ t1
-             (value env) v
+             value v
              typ t2
 
   | OP_GetElementPtr (t, tv, tvl) ->
     fprintf ppf "getelementptr (%a, %a, %a)"
              typ t
-             (tvalue env) tv
-             (pp_print_list ~pp_sep:pp_comma_space (tvalue env)) tvl
+             tvalue tv
+             (pp_print_list ~pp_sep:pp_comma_space tvalue) tvl
 
   | OP_Select (if_, then_, else_) ->
      fprintf ppf "select (%a, %a, %a)"
-             (tvalue env) if_
-             (tvalue env) then_
-             (tvalue env) else_
+             tvalue if_
+             tvalue then_
+             tvalue else_
 
   | OP_ExtractElement (vec, idx) ->
      fprintf ppf "extractelement (%a, %a)"
-             (tvalue env) vec
-             (tvalue env) idx
+             tvalue vec
+             tvalue idx
 
   | OP_InsertElement (vec, new_val, idx) ->
      fprintf ppf "insertelement (%a, %a, %a)"
-             (tvalue env) vec
-             (tvalue env) new_val
-             (tvalue env) idx
+             tvalue vec
+             tvalue new_val
+             tvalue idx
 
   | OP_ExtractValue (agg, idx) ->
      fprintf ppf "extractvalue (%a, %a)"
-             (tvalue env) agg
-             (pp_print_list ~pp_sep:pp_comma_space pp_print_int) idx
+             tvalue agg
+             (pp_print_list ~pp_sep:pp_comma_space pp_print_int) (List.map to_int idx)
 
   | OP_InsertValue (agg, new_val, idx) ->
      fprintf ppf "insertvalue (%a, %a, %a)"
-             (tvalue env) agg
-             (tvalue env) new_val
-             (pp_print_list ~pp_sep:pp_comma_space pp_print_int) idx
+             tvalue agg
+             tvalue new_val
+             (pp_print_list ~pp_sep:pp_comma_space pp_print_int) (List.map to_int idx)
 
   | OP_ShuffleVector (v1, v2, mask) ->
      fprintf ppf "shufflevector (%a, %a, %a)"
-             (tvalue env) v1
-             (tvalue env) v2
-             (tvalue env) mask
+             tvalue v1
+             tvalue v2
+             tvalue mask
 
-and inst_value : t -> Format.formatter -> Ollvm_ast.value -> unit =
-  fun env ppf (SV vv) ->
+and inst_value : Format.formatter -> Ollvm_ast.value -> unit =
+  fun ppf (SV vv) ->
     match vv with
   | VALUE_Ident _ 
   | VALUE_Integer _ 
@@ -395,15 +375,15 @@ and inst_value : t -> Format.formatter -> Ollvm_ast.value -> unit =
      fprintf ppf "%a %a %a, %a"
              ibinop op
              typ t
-             (value env) v1
-             (value env) v2
+             value v1
+             value v2
 
   | OP_ICmp (c, t, v1, v2) ->
      fprintf ppf "icmp %a %a %a, %a"
              icmp c
              typ t
-             (value env) v1
-             (value env) v2
+             value v1
+             value v2
 
   | OP_FBinop (op, f, t, v1, v2) ->
      fbinop ppf op ;
@@ -411,98 +391,98 @@ and inst_value : t -> Format.formatter -> Ollvm_ast.value -> unit =
                       pp_print_list ~pp_sep:pp_space fast_math ppf f) ;
      fprintf ppf " %a %a, %a"
              typ t
-             (value env) v1
-             (value env) v2
+             value v1
+             value v2
 
   | OP_FCmp (c, t, v1, v2) ->
      fprintf ppf "fcmp %a %a %a, %a"
              fcmp c
              typ t
-             (value env) v1
-             (value env) v2
+             value v1
+             value v2
 
   | OP_Conversion (c, t1, v, t2) ->
      fprintf ppf "%a %a %a to %a"
              conversion_type c
              typ t1
-             (value env) v
+             value v
              typ t2
 
   | OP_GetElementPtr (t, tv, tvl) ->
     fprintf ppf "getelementptr %a, %a, %a"
              typ t
-             (tvalue env) tv
-             (pp_print_list ~pp_sep:pp_comma_space (tvalue env)) tvl
+             tvalue tv
+             (pp_print_list ~pp_sep:pp_comma_space tvalue) tvl
 
   | OP_Select (if_, then_, else_) ->
      fprintf ppf "select %a, %a, %a"
-             (tvalue env) if_
-             (tvalue env) then_
-             (tvalue env) else_
+             tvalue if_
+             tvalue then_
+             tvalue else_
 
   | OP_ExtractElement (vec, idx) ->
      fprintf ppf "extractelement %a, %a"
-             (tvalue env) vec
-             (tvalue env) idx
+             tvalue vec
+             tvalue idx
 
   | OP_InsertElement (vec, new_val, idx) ->
      fprintf ppf "insertelement %a, %a, %a"
-             (tvalue env) vec
-             (tvalue env) new_val
-             (tvalue env) idx
+             tvalue vec
+             tvalue new_val
+             tvalue idx
 
   | OP_ExtractValue (agg, idx) ->
      fprintf ppf "extractvalue %a, %a"
-             (tvalue env) agg
-             (pp_print_list ~pp_sep:pp_comma_space pp_print_int) idx
+             tvalue agg
+             (pp_print_list ~pp_sep:pp_comma_space pp_print_int) (List.map to_int idx)
 
   | OP_InsertValue (agg, new_val, idx) ->
      fprintf ppf "insertvalue %a, %a, %a"
-             (tvalue env) agg
-             (tvalue env) new_val
-             (pp_print_list ~pp_sep:pp_comma_space pp_print_int) idx
+             tvalue agg
+             tvalue new_val
+             (pp_print_list ~pp_sep:pp_comma_space pp_print_int) (List.map to_int idx)
 
   | OP_ShuffleVector (v1, v2, mask) ->
      fprintf ppf "shufflevector %a, %a, %a"
-             (tvalue env) v1
-             (tvalue env) v2
-             (tvalue env) mask
+             tvalue v1
+             tvalue v2
+             tvalue mask
 
 
-and instr : t -> Format.formatter -> Ollvm_ast.instr -> unit =
-  fun env ppf ->
+and instr : Format.formatter -> Ollvm_ast.instr -> unit =
+  fun ppf ->
   function
 
-  | INSTR_Op v -> inst_value env ppf v
+  | INSTR_Op v -> inst_value ppf v
 
   | INSTR_Call (ti, tvl) ->
      fprintf ppf "call %a(%a)"
-             (tident env) ti
-             (pp_print_list ~pp_sep:pp_comma_space (tvalue env)) tvl
+             tident ti
+             (pp_print_list ~pp_sep:pp_comma_space tvalue) tvl
 
   | INSTR_Alloca (t, n, a) ->
      fprintf ppf "alloca %a" typ t ;
      (match n with None -> ()
-                 | Some n -> fprintf ppf ", %a" (tvalue env) n) ;
+                 | Some n -> fprintf ppf ", %a" tvalue n) ;
      (match a with None -> ()
-                 | Some a -> fprintf ppf ", align %d" a)
+                 | Some a -> fprintf ppf ", align %d" (to_int a))
 
   | INSTR_Load (vol, t, tv, a) ->
      pp_print_string ppf "load " ;
      if vol then pp_print_string ppf "volatile " ;
      (typ ppf t);
      pp_print_string ppf ", ";
-     (tvalue env) ppf tv ;
+     tvalue ppf tv ;
      (match a with None -> ()
-                 | Some a -> fprintf ppf ", align %d" a)
+                 | Some a -> fprintf ppf ", align %d" (to_int a))
 
   | INSTR_Phi (t, vil) ->
      fprintf ppf "phi %a [%a]"
              typ t
              (pp_print_list ~pp_sep:(pp_sep "], [")
-                            (fun ppf (i, v) -> value env ppf v ;
+                            (fun ppf (i, v) -> value ppf v ;
                                                pp_print_string ppf ", " ;
-                                               ident env ppf i)) vil
+                                               ident ppf i)) vil
 
 
   | INSTR_VAArg -> pp_print_string ppf "vaarg"
@@ -514,9 +494,9 @@ and instr : t -> Format.formatter -> Ollvm_ast.instr -> unit =
   | INSTR_Store (vol, v, ptr, a) ->
      pp_print_string ppf "store " ;
      if vol then pp_print_string ppf "volatile " ;
-     fprintf ppf "%a, %a" (tvalue env) v (tvalue env) ptr ;
+     fprintf ppf "%a, %a" tvalue v tvalue ptr ;
      (match a with None -> ()
-                 | Some a -> fprintf ppf ", align %d" a)
+                 | Some a -> fprintf ppf ", align %d" (to_int a))
 
   | INSTR_AtomicCmpXchg
   | INSTR_AtomicRMW
@@ -525,91 +505,91 @@ and instr : t -> Format.formatter -> Ollvm_ast.instr -> unit =
 
 
 
-and terminator : t -> Format.formatter -> Ollvm_ast.terminator -> unit =
-  fun env ppf ->
+and terminator : Format.formatter -> Ollvm_ast.terminator -> unit =
+  fun ppf ->
   function
 
-  | TERM_Ret (t, v)       -> fprintf ppf "ret %a" (tvalue env) (t, v)
+  | TERM_Ret (t, v)       -> fprintf ppf "ret %a" tvalue (t, v)
 
   | TERM_Ret_void         -> pp_print_string ppf "ret void"
 
   | TERM_Br (c, i1, i2)   ->
-     fprintf ppf "br %a, %a, %a" (tvalue env) c (tident env) i1 (tident env) i2
+     fprintf ppf "br %a, %a, %a" tvalue c tident i1 tident i2
 
-  | TERM_Br_1 (t, i)       -> fprintf ppf "br %a %a" typ t (ident env) i
+  | TERM_Br_1 (t, i)       -> fprintf ppf "br %a %a" typ t ident i
 
   | TERM_Switch (c, def, cases) ->
      fprintf ppf "switch %a, %a [%a]"
-             (tvalue env) c
-             (tident env) def
+             tvalue c
+             tident def
              (pp_print_list ~pp_sep:pp_space
-                            (fun ppf (v, i) -> tvalue env ppf v ;
+                            (fun ppf (v, i) -> tvalue ppf v ;
                                                pp_print_string ppf ", " ;
-                                               tident env ppf i)) cases
+                                               tident ppf i)) cases
 
-  | TERM_Resume (t, v) -> fprintf ppf "resume %a" (tvalue env) (t, v)
+  | TERM_Resume (t, v) -> fprintf ppf "resume %a" tvalue (t, v)
 
   | TERM_IndirectBr (tv, til) ->
     fprintf ppf "indirectbr %a, [%a]"
-      (tvalue env) tv
-      (pp_print_list ~pp_sep:pp_comma_space (tident env)) til
+      tvalue tv
+      (pp_print_list ~pp_sep:pp_comma_space tident) til
 
   | TERM_Invoke (ti, tvl, i2, i3) ->
      fprintf ppf "invoke %a(%a) to %a unwind %a"
-             (tident env) ti
-             (pp_print_list ~pp_sep:pp_comma_space (tvalue env)) tvl
-             (tident env) i2
-             (tident env) i3
+             tident ti
+             (pp_print_list ~pp_sep:pp_comma_space tvalue) tvl
+             tident i2
+             tident i3
 
-and id_instr : t -> Format.formatter -> (Ollvm_ast.instr_id * Ollvm_ast.instr) -> unit =
-  fun env ppf ->
+and id_instr : Format.formatter -> (Ollvm_ast.instr_id * Ollvm_ast.instr) -> unit =
+  fun ppf ->
     function (id, inst) ->
-      fprintf ppf "%a%a" (instr_id env) id (instr env) inst
+      fprintf ppf "%a%a" instr_id id instr inst
 
-and instr_id : t -> Format.formatter -> Ollvm_ast.instr_id -> unit =
-  fun env ppf ->
+and instr_id : Format.formatter -> Ollvm_ast.instr_id -> unit =
+  fun ppf ->
     function
     | IId id  -> fprintf ppf "%%%s = " (str_of_raw_id id)
-    | IVoid n -> fprintf ppf "; void instr %d" n; pp_force_newline ppf ()
+    | IVoid n -> fprintf ppf "; void instr %d" (to_int n); pp_force_newline ppf ()
   
 
-and tvalue env ppf (t, v) = fprintf ppf "%a %a" typ t (value env) v
+and tvalue ppf (t, v) = fprintf ppf "%a %a" typ t value v
 
-and tident env ppf (t, v) = fprintf ppf "%a %a" typ t (ident env) v
+and tident ppf (t, v) = fprintf ppf "%a %a" typ t ident v
 
-and toplevel_entities : t -> Format.formatter -> Ollvm_ast.toplevel_entities -> unit =
-  fun env ppf entries ->
-  pp_print_list ~pp_sep:pp_force_newline (toplevel_entity env) ppf entries
+and toplevel_entities : Format.formatter -> Ollvm_ast.toplevel_entities -> unit =
+  fun ppf entries ->
+  pp_print_list ~pp_sep:pp_force_newline toplevel_entity ppf entries
 
-and toplevel_entity : t -> Format.formatter -> Ollvm_ast.toplevel_entity -> unit =
-  fun env ppf ->
+and toplevel_entity : Format.formatter -> Ollvm_ast.toplevel_entity -> unit =
+  fun ppf ->
   function
   | TLE_Target s               -> fprintf ppf "target triple = \"%s\"" (of_str s)
   | TLE_Datalayout s           -> fprintf ppf "target datalayout = \"%s\"" (of_str s)
   | TLE_Source_filename s      -> fprintf ppf "source_filename = \"%s\"" (of_str s)
-  | TLE_Declaration d          -> declaration env ppf d
-  | TLE_Definition d           -> definition env ppf d
-  | TLE_Type_decl (i, t)       -> fprintf ppf "%a = type %a" (ident env) i typ t
-  | TLE_Global g               -> global env ppf g
-  | TLE_Metadata (i, m)        -> fprintf ppf "!%s = %a" (str_of_raw_id i) (metadata env) m
-  | TLE_Attribute_group (i, a) -> fprintf ppf "attributes #%d = { %a }" i
+  | TLE_Declaration d          -> declaration ppf d
+  | TLE_Definition d           -> definition ppf d
+  | TLE_Type_decl (i, t)       -> fprintf ppf "%a = type %a" ident i typ t
+  | TLE_Global g               -> global ppf g
+  | TLE_Metadata (i, m)        -> fprintf ppf "!%s = %a" (str_of_raw_id i) metadata m
+  | TLE_Attribute_group (i, a) -> fprintf ppf "attributes #%d = { %a }" (to_int i)
                                           (pp_print_list ~pp_sep:pp_space fn_attr) a
 
-and metadata : t -> Format.formatter -> Ollvm_ast.metadata -> unit =
-  fun env ppf ->
+and metadata : Format.formatter -> Ollvm_ast.metadata -> unit =
+  fun ppf ->
   function
-  | METADATA_Const v  -> tvalue env ppf v
+  | METADATA_Const v  -> tvalue ppf v
   | METADATA_Null     -> pp_print_string ppf "null"
   | METADATA_Id i     -> fprintf ppf "!%s" (str_of_raw_id i)
   | METADATA_String s -> fprintf ppf "!%s" (of_str s)
   | METADATA_Node m   -> fprintf ppf "!{%a}"
-                                 (pp_print_list ~pp_sep:pp_comma_space (metadata env)) m
+                                 (pp_print_list ~pp_sep:pp_comma_space metadata) m
   | METADATA_Named m  -> fprintf ppf "!{%a}"
                                  (pp_print_list ~pp_sep:pp_comma_space
                                                 (fun ppf i ->
                                                  fprintf ppf "!%s" i)) (List.map of_str m)
-and global : t -> Format.formatter -> Ollvm_ast.global -> unit =
-  fun env ppf ->
+and global : Format.formatter -> Ollvm_ast.global -> unit =
+  fun ppf ->
   fun {
     g_ident;
     g_typ;
@@ -627,14 +607,14 @@ and global : t -> Format.formatter -> Ollvm_ast.global -> unit =
                            | Some l -> linkage ppf l; pp_print_string ppf " "
        );
        (fprintf ppf "%s %a" (if g_constant then "constant" else "global") typ g_typ) ;
-       (match g_value with None -> () | Some v -> (pp_print_string ppf " "; (value env) ppf v)) ;
+       (match g_value with None -> () | Some v -> (pp_print_string ppf " "; value ppf v)) ;
        (match s with None -> ()
                    | Some s -> fprintf ppf ", section %s" (of_str s)) ;
        (match a with None -> ()
-                   | Some a -> fprintf ppf ", align %d" a)
+                   | Some a -> fprintf ppf ", align %d" (to_int a))
 
-and declaration : t -> Format.formatter -> Ollvm_ast.declaration -> unit =
-  fun env ppf ->
+and declaration : Format.formatter -> Ollvm_ast.declaration -> unit =
+  fun ppf ->
   fun { dc_name = i
       ; dc_type 
       ; dc_param_attrs = (ret_attrs, args_attrs)
@@ -677,12 +657,12 @@ and declaration : t -> Format.formatter -> Ollvm_ast.declaration -> unit =
     (match dc_section with
        Some x -> fprintf ppf "section \"%s\" " (of_str x) | _ -> ()) ;
     (match dc_align with
-       Some x -> fprintf ppf "align %d " x | _ -> ()) ;
+       Some x -> fprintf ppf "align %d " (to_int x) | _ -> ()) ;
     (match dc_gc with
        Some x -> fprintf ppf "gc \"%s\" " (of_str x) | _ -> ()) 
     
-and definition : t -> Format.formatter -> Ollvm_ast.definition -> unit =
-  fun env ppf ->
+and definition : Format.formatter -> Ollvm_ast.definition -> unit =
+  fun ppf ->
   fun ({ df_prototype =
            { dc_name = i
            ; dc_type
@@ -734,55 +714,55 @@ and definition : t -> Format.formatter -> Ollvm_ast.definition -> unit =
     (match dc_section with
        Some x -> fprintf ppf "section \"%s\" " (of_str x) | _ -> ()) ;
     (match dc_align with
-       Some x -> fprintf ppf "align %d " x | _ -> ()) ;
+       Some x -> fprintf ppf "align %d " (to_int x) | _ -> ()) ;
     (match dc_gc with
        Some x -> fprintf ppf "gc \"%s\" " (of_str x) | _ -> ()) ;
     pp_print_char ppf '{' ;
     pp_force_newline ppf () ;
-    pp_print_list ~pp_sep:pp_force_newline (block env) ppf df.df_instrs ;
+    pp_print_list ~pp_sep:pp_force_newline block ppf df.df_instrs ;
     pp_force_newline ppf () ;
     pp_print_char ppf '}' ;
 
-and block : t -> Format.formatter -> Ollvm_ast.block -> unit =
-  fun env ppf {blk_id=lbl; blk_instrs=b; blk_term=t} ->
+and block : Format.formatter -> Ollvm_ast.block -> unit =
+  fun ppf {blk_id=lbl; blk_instrs=b; blk_term=t} ->
     begin match lbl with
-      | Anon i -> fprintf ppf "; <label> %d" i
+      | Anon i -> fprintf ppf "; <label> %d" (to_int i)
       | Name s -> (pp_print_string ppf (of_str s); pp_print_char ppf ':')
     end;
     pp_force_newline ppf () ;
     pp_print_string ppf "  ";
     pp_open_box ppf 0 ;
-    pp_print_list ~pp_sep:pp_force_newline (id_instr env) ppf b ;
+    pp_print_list ~pp_sep:pp_force_newline id_instr ppf b ;
     pp_force_newline ppf () ;
-    terminator env ppf t;
+    terminator ppf t;
     pp_close_box ppf ()
 
-and modul : t -> Format.formatter -> Ollvm_ast.modul -> unit =
-  fun env ppf m ->
+and modul : Format.formatter -> Ollvm_ast.modul -> unit =
+  fun ppf m ->
 
   fprintf ppf "; ModuleID = '%s'" (of_str m.m_name) ;
   pp_force_newline ppf () ;
 
-  toplevel_entity env ppf m.m_target ;
+  toplevel_entity ppf m.m_target ;
   pp_force_newline ppf () ;
 
-  toplevel_entity env ppf m.m_datalayout ;
+  toplevel_entity ppf m.m_datalayout ;
   pp_force_newline ppf () ;
 
-  pp_print_list ~pp_sep:pp_force_newline (global (reset_local env)) ppf
+  pp_print_list ~pp_sep:pp_force_newline global ppf
                 (List.map snd m.m_globals) ;
   pp_force_newline ppf () ;
 
   (* Print function declaration only if there is no corresponding
      function definition *)
   pp_print_list
-    ~pp_sep:pp_force_newline (declaration (reset_local env)) ppf
+    ~pp_sep:pp_force_newline declaration ppf
     (List.filter (fun (n, _) -> not (List.mem_assoc n m.m_definitions))
                  m.m_declarations
      |> List.map snd) ;
   pp_force_newline ppf () ;
 
   pp_print_list
-    ~pp_sep:pp_force_newline (definition (reset_local env)) ppf
+    ~pp_sep:pp_force_newline definition ppf
     (List.map snd m.m_definitions) ;
   pp_force_newline ppf ()
